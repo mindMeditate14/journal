@@ -49,7 +49,12 @@ const journalSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ['draft', 'submitted', 'under_review', 'published', 'archived'],
-      default: 'draft',
+      default: 'published',
+      index: true,
+    },
+    isOpen: {
+      type: Boolean,
+      default: true,
       index: true,
     },
     peerReview: {

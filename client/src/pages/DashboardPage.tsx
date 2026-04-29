@@ -1,7 +1,8 @@
 import { useAuthStore } from '../utils/authStore';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { projectAPI, journalAPI } from '../services/api';
+import { projectAPI } from '../services/api';
+import apiClient from '../api/client';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Role } from '../types';
@@ -18,7 +19,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [submitJournalId, setSubmitJournalId] = useState<string | null>(null);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [submissionsLoading, setSubmissionsLoading] = useState(true);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -38,20 +40,22 @@ export default function DashboardPage() {
   }, [user]);
 
   useEffect(() => {
-    const loadJournalTarget = async () => {
-      if (!user) return;
+    const fetchSubmissions = async () => {
       try {
-        const result = await journalAPI.search('', {}, 1, 1);
-        const first = result?.journals?.[0] || result?.items?.[0] || result?.data?.[0] || null;
-        if (first?._id) {
-          setSubmitJournalId(first._id);
-        }
-      } catch {
-        // Non-blocking for dashboard
+        const response = await apiClient.get('/manuscripts', {
+          params: { page: 1, limit: 10 },
+        });
+        setSubmissions(response.data?.manuscripts || []);
+      } catch (error) {
+        // Keep dashboard usable even if submissions list fails.
+      } finally {
+        setSubmissionsLoading(false);
       }
     };
 
-    loadJournalTarget();
+    if (user) {
+      fetchSubmissions();
+    }
   }, [user]);
 
   const isAdmin = hasRole('admin', user?.roles, user?.role);
@@ -150,6 +154,48 @@ export default function DashboardPage() {
                   <div className="mt-4 flex gap-2">
                     <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
                       {project.manuscripts?.length || 0} manuscripts
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg shadow mt-8">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-900">My Submissions</h2>
+            <button
+              onClick={() => navigate('/journals')}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+            >
+              Submit New Paper
+            </button>
+          </div>
+
+          {submissionsLoading ? (
+            <p className="p-6 text-gray-600">Loading submissions...</p>
+          ) : submissions.length === 0 ? (
+            <p className="p-6 text-gray-600">No papers submitted yet. Click "Submit New Paper" to start.</p>
+          ) : (
+            <div className="divide-y">
+              {submissions.map((m: any) => (
+                <div key={m._id} className="p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">{m.title}</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Journal: {m.journalId?.title || 'Unspecified'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Submitted: {m.submittedAt ? new Date(m.submittedAt).toLocaleString() : 'N/A'}
+                      </p>
+                      {m.submissionId && (
+                        <p className="text-sm text-gray-600">Submission ID: {m.submissionId}</p>
+                      )}
+                    </div>
+                    <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded capitalize">
+                      {String(m.status || 'submitted').replace('-', ' ')}
                     </span>
                   </div>
                 </div>

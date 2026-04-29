@@ -97,7 +97,7 @@ export function SubmitManuscriptPage() {
       toast.success('Manuscript submitted! Check your email for confirmation.');
 
       setTimeout(() => {
-        navigate(`/manuscripts/${response.data.manuscript._id}`);
+        navigate('/dashboard?view=submissions');
       }, 2000);
     } catch (err) {
       setError(err.response?.data?.error || err.message);

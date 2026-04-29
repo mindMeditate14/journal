@@ -35,9 +35,15 @@ export const getJournalById = async (journalId) => {
 
 export const searchJournals = async (query, filters = {}, page = 1, limit = 20) => {
   try {
-    const searchFilter = {
-      status: 'published',
-    };
+    const searchFilter = {};
+
+    if (filters.status) {
+      searchFilter.status = filters.status;
+    }
+
+    if (filters.isOpen !== undefined && filters.isOpen !== null) {
+      searchFilter.isOpen = filters.isOpen === true || filters.isOpen === 'true';
+    }
 
     if (query) {
       searchFilter.$text = { $search: query };

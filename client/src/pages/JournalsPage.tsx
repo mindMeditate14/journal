@@ -9,6 +9,11 @@ export interface Journal {
   issn?: string;
   publisher?: string;
   url?: string;
+  isOpen?: boolean;
+  journal?: {
+    publisher?: string;
+    url?: string;
+  };
   createdAt: string;
 }
 
@@ -54,7 +59,7 @@ export default function JournalsPage() {
         url: newJournal.url || undefined,
       });
 
-      toast.success('Journal created!');
+      toast.success('Journal created and now visible in the list.');
       setNewJournal({ title: '', issn: '', publisher: '', url: '' });
       setShowCreate(false);
       fetchJournals();
@@ -170,14 +175,18 @@ export default function JournalsPage() {
                 {journal.issn && (
                   <p className="text-sm text-gray-600 mb-1">ISSN: {journal.issn}</p>
                 )}
-                {journal.publisher && (
-                  <p className="text-sm text-gray-600 mb-3">Publisher: {journal.publisher}</p>
+                {(journal.publisher || journal.journal?.publisher) && (
+                  <p className="text-sm text-gray-600 mb-1">Publisher: {journal.publisher || journal.journal?.publisher}</p>
                 )}
+                <p className="text-xs text-gray-500 mb-3">
+                  {journal.isOpen === false ? 'Closed for submissions' : 'Open for submissions'}
+                </p>
                 <button
                   onClick={() => handleSubmitToJournal(journal._id)}
+                  disabled={journal.isOpen === false}
                   className="w-full mt-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
                 >
-                  Submit Manuscript
+                  {journal.isOpen === false ? 'Submissions Closed' : 'Submit Manuscript'}
                 </button>
               </div>
             ))}

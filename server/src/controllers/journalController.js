@@ -8,14 +8,27 @@ import logger from '../utils/logger.js';
 
 export const create = async (req, res, next) => {
   try {
-    const { title, abstract, content, keywords, authors } = req.body;
+    const { title, abstract, content, keywords, authors, issn, publisher, url, isOpen } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
     }
 
     const journal = await createJournal(
-      { title, abstract, content, keywords, authors },
+      {
+        title,
+        abstract,
+        content,
+        keywords,
+        authors,
+        issn,
+        isOpen: isOpen !== undefined ? Boolean(isOpen) : true,
+        journal: {
+          name: title,
+          publisher,
+          url,
+        },
+      },
       req.userId
     );
 

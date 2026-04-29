@@ -2,23 +2,47 @@ import mongoose from 'mongoose';
 
 const manuscriptSchema = new mongoose.Schema(
   {
+    submissionId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+      default: () => `NJ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+    },
+    journalId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Journal',
+      index: true,
+    },
+    submittedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
     title: {
       type: String,
       required: true,
     },
     abstract: String,
+    body: String,
     content: String,
-    authors: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    authors: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        name: String,
+        email: String,
+        affiliation: String,
+        orcid: String,
+      },
+    ],
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
       index: true,
     },
     projectId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ResearchProject',
-      required: true,
       index: true,
     },
     version: { type: Number, default: 1 },
@@ -35,6 +59,11 @@ const manuscriptSchema = new mongoose.Schema(
     ],
     citedReferences: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Reference' }],
     linkedJournals: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Journal' }],
+    discipline: String,
+    methodology: String,
+    fundingStatement: String,
+    conflictOfInterest: String,
+    dataAvailability: String,
     linkedClinicalData: [
       {
         caseId: { type: mongoose.Schema.Types.ObjectId, ref: 'CaseStudy' },
@@ -66,10 +95,42 @@ const manuscriptSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['draft', 'in_progress', 'ready_for_review', 'submitted', 'published'],
+      enum: [
+        'draft',
+        'in_progress',
+        'ready_for_review',
+        'submitted',
+        'under-review',
+        'revision-requested',
+        'accepted',
+        'rejected',
+        'published',
+      ],
       default: 'draft',
       index: true,
     },
+    assignedEditor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    reviews: [
+      {
+        reviewerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewerName: String,
+        score: Number,
+        recommendation: String,
+        feedback: String,
+        isAnonymous: { type: Boolean, default: true },
+        submittedAt: Date,
+      },
+    ],
+    editorDecision: String,
+    editorNotes: String,
+    revisionRound: { type: Number, default: 0 },
+    submittedAt: Date,
+    acceptedAt: Date,
+    publishedAt: Date,
+    doi: String,
     submissionMetadata: {
       submittedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Journal' },
       submittedAt: Date,

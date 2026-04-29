@@ -113,7 +113,11 @@ export async function listManuscripts(req, res, next) {
     const filter = { submittedBy: req.user._id };
 
     if (status) {
-      filter.status = status;
+      const statusValues = String(status)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      filter.status = statusValues.length > 1 ? { $in: statusValues } : statusValues[0];
     }
 
     if (journalId) {
