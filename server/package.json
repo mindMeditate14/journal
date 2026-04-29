@@ -1,0 +1,48 @@
+{
+  "name": "nexusjournal-server",
+  "version": "1.0.0",
+  "description": "Clinical evidence & journal publishing platform",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "seed": "node scripts/seed.js",
+    "migrate": "node scripts/migrate.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.0",
+    "express-rate-limit": "^7.1.5",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.3",
+    "redis": "^4.6.11",
+    "@google/generative-ai": "^0.3.0",
+    "multer": "^1.4.5-lts.1",
+    "pdfkit": "^0.13.0",
+    "pdf-parse": "^1.1.1",
+    "nodemailer": "^6.9.7",
+    "winston": "^3.11.0",
+    "axios": "^1.6.2",
+    "helmet": "^7.1.0",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "vitest": "^0.34.6",
+    "supertest": "^6.3.3",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

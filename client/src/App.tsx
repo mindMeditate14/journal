@@ -1,0 +1,127 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Toaster } from 'react-hot-toast';
+import { useAuthStore } from './utils/authStore';
+import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Pages
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import DashboardPage from './pages/DashboardPage';
+import SearchPage from './pages/SearchPage';
+import NewProjectPage from './pages/NewProjectPage';
+import PaperDetailPage from './pages/PaperDetailPage';
+import AdminPage from './pages/AdminPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import JournalsPage from './pages/JournalsPage';
+import { SubmitManuscriptPage } from './pages/SubmitManuscriptPage';
+import { EditorDashboardPage } from './pages/EditorDashboardPage';
+import { PeerReviewPage } from './pages/PeerReviewPage';
+
+export default function App() {
+  const restoreSession = useAuthStore((state) => state.restoreSession);
+
+  useEffect(() => {
+    restoreSession();
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <Toaster position="top-right" />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+
+        <Route element={<Layout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <ProtectedRoute>
+                <SearchPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/papers/:id"
+            element={
+              <ProtectedRoute>
+                <PaperDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/workspace/projects/new"
+            element={
+              <ProtectedRoute>
+                <NewProjectPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminUsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/journals"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
+                <JournalsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/journals/:journalId/submit"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
+                <SubmitManuscriptPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/editor/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'editor']}>
+                <EditorDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/peer-review/:manuscriptId"
+            element={
+              <ProtectedRoute>
+                <PeerReviewPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
