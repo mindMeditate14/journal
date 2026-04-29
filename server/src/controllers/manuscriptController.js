@@ -16,6 +16,8 @@ import {
 } from '../services/manuscriptAiService.js';
 
 const toStringOrEmpty = (value) => (value === undefined || value === null ? '' : String(value).trim());
+const REVIEW_RECOMMENDATION_VALUES = ['accept', 'minor-revisions', 'major-revisions', 'reject'];
+const EDITOR_DECISION_VALUES = ['accept', 'minor-revisions', 'major-revisions', 'desk-reject', 'reject'];
 
 const normalizeDraftPayload = (payload = {}) => {
   const normalizedTitle = toStringOrEmpty(payload.title).slice(0, 300);
@@ -949,7 +951,9 @@ export async function listReviewerCandidates(req, res, next) {
 export async function submitPeerReview(req, res, next) {
   try {
     const { id } = req.params;
-    const { score, recommendation, feedback } = req.body;
+    const score = Number(req.body.score);
+    const recommendation = String(req.body.recommendation || '').trim().toLowerCase();
+    const feedback = String(req.body.feedback || '').trim();
 
     if (!score || !recommendation || !feedback) {
       return res.status(400).json({ error: 'Score, recommendation, and feedback required' });
@@ -957,6 +961,12 @@ export async function submitPeerReview(req, res, next) {
 
     if (score < 1 || score > 5) {
       return res.status(400).json({ error: 'Score must be 1-5' });
+    }
+
+    if (!REVIEW_RECOMMENDATION_VALUES.includes(recommendation)) {
+      return res.status(400).json({
+        error: `Invalid recommendation. Allowed values: ${REVIEW_RECOMMENDATION_VALUES.join(', ')}`,
+      });
     }
 
     const manuscript = await Manuscript.findById(id);
@@ -997,9 +1007,10 @@ export async function submitPeerReview(req, res, next) {
 export async function makeEditorDecision(req, res, next) {
   try {
     const { id } = req.params;
-    const { decision, editorNotes } = req.body;
+    const decision = String(req.body.decision || '').trim().toLowerCase();
+    const { editorNotes } = req.body;
 
-    if (!['accept', 'minor-revisions', 'major-revisions', 'desk-reject', 'reject'].includes(decision)) {
+    if (!EDITOR_DECISION_VALUES.includes(decision)) {
       return res.status(400).json({ error: 'Invalid decision' });
     }
 

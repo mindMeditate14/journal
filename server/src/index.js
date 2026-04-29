@@ -20,6 +20,7 @@ import workspaceRoutes from './routes/workspace.js';
 import paperRoutes from './routes/papers.js';
 import ingestRoutes from './routes/ingest.js';
 import adminRoutes from './routes/admin.js';
+import practiceDataRoutes from './routes/practiceData.js';
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/workspace', workspaceRoutes);
 app.use('/api/papers', paperRoutes);
 app.use('/api/ingest', ingestRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/practice-data', practiceDataRoutes);
 
 // Error handlers
 app.use(notFoundHandler);

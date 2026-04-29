@@ -2,6 +2,21 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import apiClient from '../api/client';
 
+const EDITOR_DECISION_OPTIONS = [
+  { value: 'accept', label: 'Accept for Publication' },
+  { value: 'minor-revisions', label: 'Minor Revisions Required' },
+  { value: 'major-revisions', label: 'Major Revisions Required' },
+  { value: 'reject', label: 'Reject' },
+  { value: 'desk-reject', label: 'Desk Reject' },
+];
+
+const formatDecisionLabel = (value?: string) => {
+  if (!value) return 'N/A';
+  const match = EDITOR_DECISION_OPTIONS.find((option) => option.value === value);
+  if (match) return match.label;
+  return String(value).replace(/-/g, ' ');
+};
+
 export function EditorDashboardPage() {
   const [submissions, setSubmissions] = useState([]);
   const [reviewerCandidates, setReviewerCandidates] = useState([]);
@@ -321,7 +336,7 @@ export function EditorDashboardPage() {
 
                             <div className="mb-2">
                               <p className="text-sm text-gray-600">Recommendation</p>
-                              <p className="font-medium text-gray-900">{review.recommendation}</p>
+                              <p className="font-medium text-gray-900">{formatDecisionLabel(review.recommendation)}</p>
                             </div>
 
                             <div>
@@ -397,11 +412,11 @@ export function EditorDashboardPage() {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Select decision...</option>
-                        <option value="accept">✅ Accept for Publication</option>
-                        <option value="minor-revisions">✏️ Accept with Minor Revisions</option>
-                        <option value="major-revisions">📝 Major Revisions Required</option>
-                        <option value="reject">❌ Reject</option>
-                        <option value="desk-reject">⚠️ Desk Reject</option>
+                        {EDITOR_DECISION_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
 

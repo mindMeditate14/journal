@@ -3,6 +3,13 @@ import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import apiClient from '../api/client';
 
+const REVIEW_RECOMMENDATION_OPTIONS = [
+  { value: 'accept', label: 'Accept' },
+  { value: 'minor-revisions', label: 'Minor Revisions Required' },
+  { value: 'major-revisions', label: 'Major Revisions Required' },
+  { value: 'reject', label: 'Reject' },
+];
+
 export function PeerReviewPage() {
   const { manuscriptId } = useParams();
   const [manuscript, setManuscript] = useState(null);
@@ -270,11 +277,11 @@ export function PeerReviewPage() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select a recommendation...</option>
-              <option value="accept">✅ Accept as is</option>
-              <option value="minor-revisions">📝 Accept with minor revisions</option>
-              <option value="major-revisions">✏️ Accept with major revisions</option>
-              <option value="reject">❌ Reject</option>
-              <option value="desk-reject">⚠️ Desk reject</option>
+              {REVIEW_RECOMMENDATION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
 

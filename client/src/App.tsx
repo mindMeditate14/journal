@@ -18,6 +18,8 @@ import AdminPage from './pages/AdminPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import JournalsPage from './pages/JournalsPage';
 import ManuscriptCreatePage from './pages/ManuscriptCreatePage';
+import PracticeDataCollectionPage from './pages/PracticeDataCollectionPage';
+import GeneratePracticeManuscriptPage from './pages/GeneratePracticeManuscriptPage';
 import { SubmitManuscriptPage } from './pages/SubmitManuscriptPage';
 import { EditorDashboardPage } from './pages/EditorDashboardPage';
 import { PeerReviewPage } from './pages/PeerReviewPage';
@@ -101,6 +103,22 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
                 <ManuscriptCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/practice-data/create"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
+                <PracticeDataCollectionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/practice-data/:practiceDataId/generate-manuscript"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
+                <GeneratePracticeManuscriptPage />
               </ProtectedRoute>
             }
           />

@@ -31,7 +31,9 @@
     "@monaco-editor/react": "^4.5.0",
     "react-hot-toast": "^2.4.1",
     "clsx": "^2.0.0",
-    "pdfjs-dist": "^4.0.379"
+    "pdfjs-dist": "^4.0.379",
+    "chart.js": "^4.4.0",
+    "html2pdf.js": "^0.10.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",

@@ -1,6 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const getModel = () => {
+const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
+const DEFAULT_MINIMAX_MODEL = 'MiniMax-M1';
+
+const getProvider = () => String(process.env.AI_PROVIDER || 'gemini').trim().toLowerCase();
+
+const getGeminiModel = () => {
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
   if (!apiKey || apiKey === 'your-gemini-api-key') {
     const error = new Error('GOOGLE_GEMINI_API_KEY is not configured');
@@ -9,7 +14,31 @@ const getModel = () => {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-1.5-flash' });
+  return genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL });
+};
+
+const getMinimaxConfig = () => {
+  const apiKey = process.env.MINIMAX_API_KEY;
+  const baseUrl = String(process.env.MINIMAX_BASE_URL || '').trim();
+  const model = String(process.env.MINIMAX_MODEL || DEFAULT_MINIMAX_MODEL).trim();
+
+  if (!apiKey || apiKey === 'your-minimax-api-key') {
+    const error = new Error('MINIMAX_API_KEY is not configured');
+    error.status = 503;
+    throw error;
+  }
+
+  if (!baseUrl) {
+    const error = new Error('MINIMAX_BASE_URL is not configured');
+    error.status = 503;
+    throw error;
+  }
+
+  return {
+    apiKey,
+    baseUrl: baseUrl.replace(/\/+$/, ''),
+    model,
+  };
 };
 
 const extractJson = (text = '') => {
@@ -27,10 +56,59 @@ const extractJson = (text = '') => {
   return JSON.parse(text);
 };
 
-const generateJson = async (prompt) => {
-  const model = getModel();
+const generateGeminiJson = async (prompt) => {
+  const model = getGeminiModel();
   const result = await model.generateContent(prompt);
-  const text = result?.response?.text?.() || '';
+  return result?.response?.text?.() || '';
+};
+
+const generateMinimaxJson = async (prompt) => {
+  const { apiKey, baseUrl, model } = getMinimaxConfig();
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content: 'Return valid JSON only. No markdown fences, no extra commentary.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    const error = new Error(`Minimax request failed: ${response.status} ${details}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  const payload = await response.json();
+  return payload?.choices?.[0]?.message?.content || '';
+};
+
+const generateJson = async (prompt) => {
+  const provider = getProvider();
+  let text = '';
+
+  if (provider === 'minimax') {
+    text = await generateMinimaxJson(prompt);
+  } else {
+    text = await generateGeminiJson(prompt);
+  }
+
   return extractJson(text);
 };
 

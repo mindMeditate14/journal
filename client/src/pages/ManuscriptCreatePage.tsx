@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import apiClient from '../api/client';
 import { manuscriptAPI } from '../services/api';
+import { DISCIPLINES, METHODOLOGIES } from '../constants/manuscriptOptions';
 
 type JournalOption = { _id: string; title: string; isOpen?: boolean };
 type ProjectOption = { _id: string; title: string };
@@ -455,20 +456,32 @@ export default function ManuscriptCreatePage() {
               required
             />
             <div className="grid md:grid-cols-2 gap-4">
-              <input
+              <select
                 value={structuredInput.discipline}
                 onChange={(e) => setStructuredInput((p) => ({ ...p, discipline: e.target.value }))}
-                placeholder="Discipline"
                 className="px-3 py-2 border border-gray-300 rounded-lg"
                 required
-              />
-              <input
+              >
+                <option value="">Select discipline</option>
+                {DISCIPLINES.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+              <select
                 value={structuredInput.methodology}
                 onChange={(e) => setStructuredInput((p) => ({ ...p, methodology: e.target.value }))}
-                placeholder="Methodology"
                 className="px-3 py-2 border border-gray-300 rounded-lg"
                 required
-              />
+              >
+                <option value="">Select methodology</option>
+                {METHODOLOGIES.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <textarea
               value={structuredInput.objective}
@@ -557,6 +570,32 @@ export default function ManuscriptCreatePage() {
               required
             />
             <div className="grid md:grid-cols-3 gap-4">
+              <select
+                value={clinicalInput.discipline}
+                onChange={(e) => setClinicalInput((p) => ({ ...p, discipline: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+                required
+              >
+                <option value="">Select discipline</option>
+                {DISCIPLINES.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={clinicalInput.methodology}
+                onChange={(e) => setClinicalInput((p) => ({ ...p, methodology: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+                required
+              >
+                <option value="">Select methodology</option>
+                {METHODOLOGIES.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
               <input
                 value={clinicalInput.condition}
                 onChange={(e) => setClinicalInput((p) => ({ ...p, condition: e.target.value }))}
@@ -564,6 +603,8 @@ export default function ManuscriptCreatePage() {
                 className="px-3 py-2 border border-gray-300 rounded-lg"
                 required
               />
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
               <input
                 value={clinicalInput.intervention}
                 onChange={(e) => setClinicalInput((p) => ({ ...p, intervention: e.target.value }))}
