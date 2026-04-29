@@ -4,6 +4,7 @@ import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
 import { connectDB } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import logger from './utils/logger.js';
@@ -29,6 +30,9 @@ app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || '*' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }));
+
+// Serve uploaded working/final manuscript files.
+app.use('/uploads', express.static(path.resolve(process.cwd(), '../public/uploads')));
 
 // 5xx rate alerting — must be before routes
 app.use(fiveXxMiddleware);

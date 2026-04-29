@@ -1,8 +1,8 @@
 # NexusJournal — System Architecture
 
-**Version:** v1.0.0  
+**Version:** v1.1.0  
 **Date:** April 2026  
-**Status:** Architecture Phase
+**Status:** Active implementation
 
 ---
 
@@ -16,6 +16,42 @@ NexusJournal is a federated clinical evidence and journal publishing platform co
 
 ### Core Value Proposition
 Researchers convert clinical cases into peer-reviewed journal drafts using structured evidence, powered by knowledge graphs and RAG-assisted literature review.
+
+### Implemented Authoring Workflow (April 2026)
+
+Manuscript creation now starts from a dedicated three-path entry UI:
+
+1. Upload Existing PDF
+- `POST /api/manuscripts/extract-metadata` for extraction preview
+- `POST /api/manuscripts/drafts/from-pdf` to persist draft
+
+2. Generate from Structured Input
+- `POST /api/manuscripts/drafts` with `sourcePath='ai_wizard'`
+- Optional AI assist: `POST /api/manuscripts/ai/structured-draft` and `POST /api/manuscripts/ai/outline`
+
+3. Generate from Clinical Case Inputs
+- `POST /api/manuscripts/drafts` with `sourcePath='clinical_case'`
+- Optional AI assist: `POST /api/manuscripts/ai/clinical-draft` and `POST /api/manuscripts/ai/section`
+
+4. Existing Paper Fast-Track (already written externally)
+- `POST /api/manuscripts/submit-existing` with PDF/DOC/DOCX attachment
+- Editor reviews in the same dashboard flow as tool-authored manuscripts
+- Uploaded file is stored as `workingDocument` for correction cycle
+
+5. Collaborative correction cycle (before publication)
+- `POST /api/manuscripts/:id/working-document` accepts PDF/DOC/DOCX replacements
+- Researcher/editor/reviewer can iteratively update the working file
+- Review notes remain in manuscript review feedback / editor notes
+
+All paths converge on one draft model in `Manuscript`, then finalize through:
+- `PATCH /api/manuscripts/:id` (author edits draft)
+- `POST /api/manuscripts` with `draftId` (submission to editorial workflow)
+
+Publication/search indexing rule:
+- Accepted manuscripts require `POST /api/manuscripts/:id/final-document` (PDF only) before editor publish.
+- Only this final PDF is used for published paper discovery links.
+
+`POST /api/manuscripts/:id/comments` was removed from the active API surface because comment endpoints are not currently implemented in server routes.
 
 ---
 
@@ -194,6 +230,7 @@ Data Layer
 {
   _id: ObjectId,
   title: String,
+  sourcePath: Enum ['manual', 'pdf_import', 'ai_wizard', 'clinical_case'],
   abstract: String,
   content: String (rich HTML),     // Editor.js blocks or Markdown
   authors: [ObjectId],             // References to Users
@@ -236,6 +273,32 @@ Data Layer
   },
   
   status: Enum ['draft', 'in_progress', 'ready_for_review', 'submitted', 'published'],
+  completenessScore: Number,       // 0-100 draft quality score
+  validationState: Enum ['incomplete', 'review_needed', 'ready_for_submission'],
+  extractionReport: {
+    parser: String,
+    fileName: String,
+    fileSize: Number,
+    extractedAt: Date,
+    rawTextPreview: String
+  },
+  metadata: {
+    affiliations: [String],
+    sectionHeadings: [String],
+    references: [String],
+    citationDetails: {
+      doi: String,
+      rawCitation: String
+    },
+    extractionConfidence: {
+      title: Number,
+      authors: Number,
+      abstract: Number,
+      keywords: Number,
+      references: Number
+    },
+    extractionWarnings: [String]
+  },
   submissionMetadata: {
     submittedTo: ObjectId,         // Journal reference
     submittedAt: Date,

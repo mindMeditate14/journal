@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ingestAPI, paperAPI } from '../services/api';
+import apiClient from '../api/client';
 import { IngestRun, Paper } from '../types';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../utils/authStore';
@@ -28,6 +29,19 @@ export default function SearchPage() {
   const [ingestRuns, setIngestRuns] = useState<IngestRun[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
+  const [journals, setJournals] = useState<Array<{ _id: string; title: string; isOpen?: boolean }>>([]);
+  const [existingPaperSubmitting, setExistingPaperSubmitting] = useState(false);
+  const [existingPaperFile, setExistingPaperFile] = useState<File | null>(null);
+  const [existingPaper, setExistingPaper] = useState({
+    journalId: '',
+    title: '',
+    abstract: '',
+    description: '',
+    authors: '',
+    keywords: '',
+    discipline: 'General',
+    methodology: 'external-submission',
+  });
   const navigate = useNavigate();
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total, limit]);
@@ -130,6 +144,67 @@ export default function SearchPage() {
       loadIngestRuns();
     }
   }, [user?.role]);
+
+  useEffect(() => {
+    const loadJournals = async () => {
+      try {
+        const response = await apiClient.get('/journals/search', {
+          params: { q: '', page: 1, limit: 100, isOpen: true },
+        });
+        setJournals(response.data?.journals || []);
+      } catch {
+        // ignore load failures; this section is optional
+      }
+    };
+
+    loadJournals();
+  }, []);
+
+  const submitExistingPaper = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!existingPaper.journalId || !existingPaper.title.trim() || !existingPaper.abstract.trim()) {
+      toast.error('Journal, title and abstract are required.');
+      return;
+    }
+    if (!existingPaperFile) {
+      toast.error('Attach PDF/Word document first.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('journalId', existingPaper.journalId);
+    formData.append('title', existingPaper.title);
+    formData.append('abstract', existingPaper.abstract);
+    formData.append('description', existingPaper.description || existingPaper.abstract);
+    formData.append('authors', existingPaper.authors);
+    formData.append('keywords', existingPaper.keywords);
+    formData.append('discipline', existingPaper.discipline);
+    formData.append('methodology', existingPaper.methodology);
+    formData.append('document', existingPaperFile);
+
+    setExistingPaperSubmitting(true);
+    try {
+      await apiClient.post('/manuscripts/submit-existing', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Paper submitted for editor review.');
+      setExistingPaper({
+        journalId: '',
+        title: '',
+        abstract: '',
+        description: '',
+        authors: '',
+        keywords: '',
+        discipline: 'General',
+        methodology: 'external-submission',
+      });
+      setExistingPaperFile(null);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to submit existing paper');
+    } finally {
+      setExistingPaperSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -280,6 +355,81 @@ export default function SearchPage() {
           </div>
         )}
 
+        <div className="mb-8 bg-white rounded-lg shadow p-6 border border-emerald-100">
+          <h2 className="text-lg font-semibold text-gray-900">Have an Existing Paper?</h2>
+          <p className="text-sm text-gray-600 mt-1 mb-4">
+            Attach PDF/Word with short description. Editor can fast-review this path and publish once approved.
+          </p>
+          <form onSubmit={submitExistingPaper} className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <select
+                value={existingPaper.journalId}
+                onChange={(e) => setExistingPaper((prev) => ({ ...prev, journalId: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                <option value="">Select target journal</option>
+                {journals
+                  .filter((journal) => journal.isOpen !== false)
+                  .map((journal) => (
+                    <option key={journal._id} value={journal._id}>
+                      {journal.title}
+                    </option>
+                  ))}
+              </select>
+              <input
+                type="text"
+                value={existingPaper.title}
+                onChange={(e) => setExistingPaper((prev) => ({ ...prev, title: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Paper title"
+              />
+            </div>
+            <textarea
+              value={existingPaper.abstract}
+              onChange={(e) => setExistingPaper((prev) => ({ ...prev, abstract: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows={3}
+              placeholder="Short abstract (required)"
+            />
+            <textarea
+              value={existingPaper.description}
+              onChange={(e) => setExistingPaper((prev) => ({ ...prev, description: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows={3}
+              placeholder="Paper description for editor review"
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={existingPaper.authors}
+                onChange={(e) => setExistingPaper((prev) => ({ ...prev, authors: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Authors (comma separated)"
+              />
+              <input
+                type="text"
+                value={existingPaper.keywords}
+                onChange={(e) => setExistingPaper((prev) => ({ ...prev, keywords: e.target.value }))}
+                className="px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Keywords (comma separated)"
+              />
+            </div>
+            <input
+              type="file"
+              accept="application/pdf,.doc,.docx"
+              onChange={(e) => setExistingPaperFile(e.target.files?.[0] || null)}
+              className="text-sm"
+            />
+            <button
+              type="submit"
+              disabled={existingPaperSubmitting}
+              className="bg-emerald-600 text-white px-5 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {existingPaperSubmitting ? 'Submitting...' : 'Submit Existing Paper for Review'}
+            </button>
+          </form>
+        </div>
+
         <form onSubmit={handleSearch} className="mb-8">
           <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
             <input
@@ -375,7 +525,6 @@ export default function SearchPage() {
               onClick={() => navigate(`/papers/${paper._id}`)}
             >
               <h3 className="text-lg font-semibold text-gray-900">{paper.title}</h3>
-              <p className="text-gray-600 mt-2 line-clamp-2">{paper.abstract || 'No abstract available.'}</p>
               <div className="mt-4 flex gap-4 text-sm text-gray-600">
                 <span>👤 {paper.authors?.[0]?.name || 'Unknown'}</span>
                 <span>📖 {paper.journal?.name || 'Unknown journal'}</span>

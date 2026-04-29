@@ -197,68 +197,345 @@ Response: 200 OK
 
 ---
 
-## Manuscript Endpoints (Phase 2)
+## Manuscript Endpoints
 
-### Create Manuscript
+### Submit Existing Paper (External Document)
 ```
-POST /manuscripts
+POST /manuscripts/submit-existing
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+Fields:
+- journalId (required)
+- title (required)
+- abstract (required)
+- description (optional)
+- discipline (optional)
+- methodology (optional)
+- keywords (optional comma-separated)
+- authors (optional comma-separated)
+- document (required: PDF/DOC/DOCX)
+
+Response: 201 Created
+{
+  "success": true,
+  "manuscript": {
+    "_id": "...",
+    "submissionId": "...",
+    "status": "submitted",
+    "title": "..."
+  }
+}
+```
+
+### Upload Working Document (Editable Review File)
+```
+POST /manuscripts/:id/working-document
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+Fields:
+- document (required: PDF/DOC/DOCX)
+
+Notes:
+- Intended for researcher/reviewer/editor correction cycle.
+- Can be replaced before publication.
+
+Response: 200 OK
+{
+  "success": true,
+  "workingDocument": {
+    "url": "/uploads/manuscripts/<file>",
+    "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  }
+}
+```
+
+### Upload Final Publication PDF
+```
+POST /manuscripts/:id/final-document
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+Fields:
+- document (required: PDF only)
+
+Notes:
+- Allowed only after editorial acceptance.
+- This final PDF is used for public publication/search.
+```
+
+### Publish Accepted Manuscript
+```
+POST /manuscripts/:id/publish
+Authorization: Bearer <token>
+
+Rules:
+- Manuscript status must be accepted.
+- A final PDF must already be uploaded.
+```
+
+### Create Draft (Structured or Clinical Input)
+```
+POST /manuscripts/drafts
 Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "title": "Case Study: Hypertension Treatment",
+  "sourcePath": "ai_wizard", // manual | pdf_import | ai_wizard | clinical_case
+  "journalId": "...",
   "projectId": "...",
+  "title": "Integrative intervention outcomes",
   "abstract": "...",
-  "sections": [
-    {
-      "type": "introduction",
-      "title": "Background",
-      "content": "...",
-      "order": 1
-    }
-  ]
+  "keywords": ["integrative care", "case report"],
+  "authors": [{ "name": "Dr. A", "email": "a@example.com" }],
+  "discipline": "Medicine",
+  "methodology": "case-study",
+  "body": "## Introduction\n..."
 }
 
 Response: 201 Created
+{
+  "success": true,
+  "manuscript": {
+    "_id": "...",
+    "status": "draft",
+    "validationState": "review_needed",
+    "completenessScore": 70
+  }
+}
+```
+
+### Extract Metadata From PDF (No Draft Persist)
+```
+POST /manuscripts/extract-metadata
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+Form field: pdf=<file>
+
+Response: 200 OK
+{
+  "success": true,
+  "extracted": {
+    "title": "...",
+    "authors": [...],
+    "abstract": "...",
+    "keywords": [...],
+    "body": "...",
+    "metadata": {
+      "sectionHeadings": [...],
+      "references": [...],
+      "citationDetails": { "doi": "..." },
+      "extractionConfidence": { "title": 0.85 }
+    },
+    "extractionReport": {
+      "parser": "pdf-parse",
+      "fileName": "paper.pdf"
+    }
+  }
+}
+```
+
+### Create Draft From PDF
+```
+POST /manuscripts/drafts/from-pdf
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+Form fields:
+  pdf=<file>
+  journalId=<journalId>
+  projectId=<optional>
+
+Response: 201 Created
+{
+  "success": true,
+  "manuscript": { "_id": "...", "status": "draft" },
+  "extracted": { "title": "..." }
+}
+```
+
+### Submit Existing Paper With Document (Fast Review Path)
+```
+POST /manuscripts/submit-existing
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+Form fields:
+  journalId=<journalId>
+  title=<paper title>
+  abstract=<short abstract>
+  description=<paper description>
+  authors=<comma-separated names>
+  keywords=<comma-separated keywords>
+  discipline=<optional>
+  methodology=<optional>
+  document=<PDF|DOC|DOCX>
+
+Response: 201 Created
+{
+  "success": true,
+  "manuscript": {
+    "_id": "...",
+    "submissionId": "NJ-...",
+    "status": "submitted"
+  }
+}
+```
+
+### List Manuscripts
+```
+GET /manuscripts?status=draft,submitted&journalId=...&page=1&limit=20
+Authorization: Bearer <token>
+
+Behavior:
+- Researchers see manuscripts where `submittedBy = current user`
+- Editors see assigned manuscripts plus manuscripts from journals they own
+- Admins can list across all manuscripts
+```
+
+### AI Outline Generation
+```
+POST /manuscripts/ai/outline
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "...",
+  "abstract": "...",
+  "discipline": "Medicine",
+  "methodology": "case-study",
+  "sourcePath": "ai_wizard"
+}
+```
+
+### AI Section Generation
+```
+POST /manuscripts/ai/section
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "sectionType": "methods",
+  "title": "...",
+  "abstract": "...",
+  "methodology": "...",
+  "keyPoints": ["..."],
+  "context": "..."
+}
+```
+
+### AI Structured Draft Generation
+```
+POST /manuscripts/ai/structured-draft
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "...",
+  "abstract": "...",
+  "discipline": "...",
+  "methodology": "...",
+  "objective": "...",
+  "methods": "...",
+  "findings": "...",
+  "limitations": "..."
+}
+```
+
+### AI Clinical Draft Generation
+```
+POST /manuscripts/ai/clinical-draft
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "...",
+  "abstract": "...",
+  "discipline": "Medicine",
+  "methodology": "case-study",
+  "condition": "...",
+  "intervention": "...",
+  "outcome": "...",
+  "notes": "..."
+}
 ```
 
 ### Get Manuscript
 ```
 GET /manuscripts/:id
 Authorization: Bearer <token>
-
-Response: 200 OK
-{ ... manuscript with all sections ... }
 ```
 
-### Auto-save Manuscript
+### Update Draft
 ```
 PATCH /manuscripts/:id
 Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "content": "...",
-  "sections": [...],
-  "status": "in_progress"
+  "title": "Updated title",
+  "abstract": "Updated abstract",
+  "body": "Updated body",
+  "metadata": {
+    "extractionWarnings": []
+  }
 }
+```
+
+### Get Draft Extraction Report
+```
+GET /manuscripts/:id/extraction-report
+Authorization: Bearer <token>
+```
+
+### Upload Final Publication Document
+```
+POST /manuscripts/:id/final-document
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+Form field:
+  document=<PDF|DOC|DOCX>
 
 Response: 200 OK
+{
+  "success": true,
+  "finalDocument": {
+    "url": "/uploads/manuscripts/..."
+  }
+}
 ```
 
-### Add Comment
+### Submit Manuscript (Draft-Aware)
 ```
-POST /manuscripts/:id/comments
+POST /manuscripts
 Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "text": "This section needs clarification",
-  "range": { "from": 100, "to": 150 }
+  "draftId": "...", // optional, if omitted it submits from payload directly
+  "journalId": "...",
+  "title": "...",
+  "abstract": "...",
+  "authors": [{ "name": "...", "email": "..." }],
+  "body": "...",
+  "discipline": "...",
+  "methodology": "..."
 }
 
 Response: 201 Created
+{
+  "success": true,
+  "manuscript": {
+    "_id": "...",
+    "submissionId": "NJ-...",
+    "status": "submitted",
+    "submittedAt": "..."
+  }
+}
 ```
+
+Note: Publishing to search index requires an uploaded `finalDocument` on the manuscript.
 
 ---
 

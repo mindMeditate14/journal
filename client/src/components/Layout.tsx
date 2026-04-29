@@ -52,11 +52,11 @@ export default function Layout() {
               Search
             </button>
             <button
-              onClick={() => navigate('/workspace/projects/new')}
+              onClick={() => navigate('/manuscripts/create')}
               className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
             >
               <Plus size={20} />
-              New
+              Create
             </button>
             {isEditor && (
               <button
@@ -127,10 +127,10 @@ export default function Layout() {
               Search
             </button>
             <button
-              onClick={() => navigate('/workspace/projects/new')}
+              onClick={() => navigate('/manuscripts/create')}
               className="w-full text-left px-4 py-2 hover:bg-gray-100"
             >
-              New Project
+              Create Manuscript
             </button>
             {isEditor && (
               <button

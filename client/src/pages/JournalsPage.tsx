@@ -78,14 +78,22 @@ export default function JournalsPage() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Journals</h1>
-            <p className="text-gray-600 mt-2">Select a journal to submit your manuscript</p>
+            <p className="text-gray-600 mt-2">Manage journals and open manuscript workflows</p>
           </div>
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-          >
-            {showCreate ? 'Cancel' : 'Create Journal'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/manuscripts/create')}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700"
+            >
+              Create Manuscript
+            </button>
+            <button
+              onClick={() => setShowCreate(!showCreate)}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+            >
+              {showCreate ? 'Cancel' : 'Create Journal'}
+            </button>
+          </div>
         </div>
 
         {showCreate && (

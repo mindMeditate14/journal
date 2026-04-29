@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { projectAPI } from '../services/api';
 import apiClient from '../api/client';
+import { manuscriptAPI } from '../services/api';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Role } from '../types';
@@ -21,6 +22,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
+  const [uploadingDocFor, setUploadingDocFor] = useState<string | null>(null);
+  const [uploadingWorkingDocFor, setUploadingWorkingDocFor] = useState<string | null>(null);
+  const [selectedDocs, setSelectedDocs] = useState<Record<string, File | null>>({});
+  const [selectedWorkingDocs, setSelectedWorkingDocs] = useState<Record<string, File | null>>({});
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -58,6 +63,63 @@ export default function DashboardPage() {
     }
   }, [user]);
 
+  const refreshSubmissions = async () => {
+    try {
+      const response = await apiClient.get('/manuscripts', {
+        params: { page: 1, limit: 10 },
+      });
+      setSubmissions(response.data?.manuscripts || []);
+    } catch {
+      // ignore refresh errors
+    }
+  };
+
+  const handleFinalDocumentUpload = async (manuscriptId: string) => {
+    const file = selectedDocs[manuscriptId];
+    if (!file) {
+      toast.error('Select a PDF/Word file first');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('document', file);
+
+    setUploadingDocFor(manuscriptId);
+    try {
+      await manuscriptAPI.uploadFinalDocument(manuscriptId, formData);
+      toast.success('Final document uploaded. Editor can now publish after approval.');
+      setSelectedDocs((prev) => ({ ...prev, [manuscriptId]: null }));
+      await refreshSubmissions();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to upload final document');
+    } finally {
+      setUploadingDocFor(null);
+    }
+  };
+
+  const handleWorkingDocumentUpload = async (manuscriptId: string) => {
+    const file = selectedWorkingDocs[manuscriptId];
+    if (!file) {
+      toast.error('Select a Word/PDF file first');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('document', file);
+
+    setUploadingWorkingDocFor(manuscriptId);
+    try {
+      await manuscriptAPI.uploadWorkingDocument(manuscriptId, formData);
+      toast.success('Working document updated for editor/reviewer corrections.');
+      setSelectedWorkingDocs((prev) => ({ ...prev, [manuscriptId]: null }));
+      await refreshSubmissions();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to upload working document');
+    } finally {
+      setUploadingWorkingDocFor(null);
+    }
+  };
+
   const isAdmin = hasRole('admin', user?.roles, user?.role);
   const isEditor = hasRole('editor', user?.roles, user?.role) || isAdmin;
   const isResearcher = hasRole('researcher', user?.roles, user?.role) || isAdmin;
@@ -87,10 +149,10 @@ export default function DashboardPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => navigate('/journals')}
+                  onClick={() => navigate('/manuscripts/create')}
                   className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
                 >
-                  Open Submission Form
+                  Create Manuscript
                 </button>
               </div>
             )}
@@ -166,17 +228,17 @@ export default function DashboardPage() {
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-900">My Submissions</h2>
             <button
-              onClick={() => navigate('/journals')}
+              onClick={() => navigate('/manuscripts/create')}
               className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
             >
-              Submit New Paper
+              New Manuscript Draft
             </button>
           </div>
 
           {submissionsLoading ? (
             <p className="p-6 text-gray-600">Loading submissions...</p>
           ) : submissions.length === 0 ? (
-            <p className="p-6 text-gray-600">No papers submitted yet. Click "Submit New Paper" to start.</p>
+            <p className="p-6 text-gray-600">No papers submitted yet. Click "New Manuscript Draft" to start.</p>
           ) : (
             <div className="divide-y">
               {submissions.map((m: any) => (
@@ -193,11 +255,99 @@ export default function DashboardPage() {
                       {m.submissionId && (
                         <p className="text-sm text-gray-600">Submission ID: {m.submissionId}</p>
                       )}
+                      {m.editorNotes && (
+                        <p className="text-sm text-amber-700 mt-1">Editor note: {m.editorNotes}</p>
+                      )}
+                      {(m.workingDocument?.url || m.finalDocument?.url) && (
+                        <a
+                          href={m.workingDocument?.url || m.finalDocument?.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-indigo-700 underline mt-1 inline-block"
+                        >
+                          Open working document
+                        </a>
+                      )}
+                      {m.finalDocument?.url && (
+                        <a
+                          href={m.finalDocument.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-emerald-700 underline mt-1 ml-3 inline-block"
+                        >
+                          Open final PDF
+                        </a>
+                      )}
                     </div>
                     <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded capitalize">
                       {String(m.status || 'submitted').replace('-', ' ')}
                     </span>
                   </div>
+
+                  {(m.status === 'submitted' || m.status === 'under-review' || m.status === 'revision-requested' || m.status === 'accepted' || m.status === 'rejected') && (
+                    <div className="mt-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                      <p className="text-sm text-gray-700 mb-2">
+                        Upload editable Word/PDF working document so reviewer/editor can annotate and request corrections.
+                        {m.status === 'rejected' || m.status === 'revision-requested'
+                          ? ' Uploading here will resubmit this manuscript to the editor queue.'
+                          : ''}
+                      </p>
+                      <div className="flex flex-col md:flex-row md:items-center gap-2">
+                        <input
+                          type="file"
+                          accept="application/pdf,.doc,.docx"
+                          onChange={(e) =>
+                            setSelectedWorkingDocs((prev) => ({
+                              ...prev,
+                              [m._id]: e.target.files?.[0] || null,
+                            }))
+                          }
+                          className="text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleWorkingDocumentUpload(m._id)}
+                          disabled={uploadingWorkingDocFor === m._id}
+                          className="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                        >
+                          {uploadingWorkingDocFor === m._id
+                            ? 'Uploading...'
+                            : m.status === 'rejected' || m.status === 'revision-requested'
+                              ? 'Upload Revised Document & Resubmit'
+                              : 'Upload Working Document'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {m.status === 'accepted' && (
+                    <div className="mt-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                      <p className="text-sm text-gray-700 mb-2">
+                        After approval, upload final PDF for searchable publication.
+                      </p>
+                      <div className="flex flex-col md:flex-row md:items-center gap-2">
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          onChange={(e) =>
+                            setSelectedDocs((prev) => ({
+                              ...prev,
+                              [m._id]: e.target.files?.[0] || null,
+                            }))
+                          }
+                          className="text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleFinalDocumentUpload(m._id)}
+                          disabled={uploadingDocFor === m._id}
+                          className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {uploadingDocFor === m._id ? 'Uploading...' : 'Upload Final Document'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

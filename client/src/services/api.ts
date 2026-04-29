@@ -56,8 +56,90 @@ export const manuscriptAPI = {
     const { data } = await apiClient.patch(`/manuscripts/${id}`, updates);
     return data;
   },
-  addComment: async (id: string, comment: any) => {
-    const { data } = await apiClient.post(`/manuscripts/${id}/comments`, comment);
+  createDraft: async (payload: Partial<Manuscript>) => {
+    const { data } = await apiClient.post('/manuscripts/drafts', payload);
+    return data;
+  },
+  createDraftFromPdf: async (formData: FormData) => {
+    const { data } = await apiClient.post('/manuscripts/drafts/from-pdf', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+  extractMetadataFromPdf: async (formData: FormData) => {
+    const { data } = await apiClient.post('/manuscripts/extract-metadata', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+  getExtractionReport: async (id: string) => {
+    const { data } = await apiClient.get(`/manuscripts/${id}/extraction-report`);
+    return data;
+  },
+  submitExistingPaper: async (formData: FormData) => {
+    const { data } = await apiClient.post('/manuscripts/submit-existing', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+  uploadFinalDocument: async (manuscriptId: string, formData: FormData) => {
+    const { data } = await apiClient.post(`/manuscripts/${manuscriptId}/final-document`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+  uploadWorkingDocument: async (manuscriptId: string, formData: FormData) => {
+    const { data } = await apiClient.post(`/manuscripts/${manuscriptId}/working-document`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+  generateOutline: async (payload: {
+    title?: string;
+    abstract?: string;
+    discipline?: string;
+    methodology?: string;
+    sourcePath?: string;
+  }) => {
+    const { data } = await apiClient.post('/manuscripts/ai/outline', payload);
+    return data;
+  },
+  generateSection: async (payload: {
+    sectionType: string;
+    title?: string;
+    abstract?: string;
+    methodology?: string;
+    sourcePath?: string;
+    keyPoints?: string[];
+    context?: string;
+  }) => {
+    const { data } = await apiClient.post('/manuscripts/ai/section', payload);
+    return data;
+  },
+  generateStructuredDraft: async (payload: {
+    title: string;
+    abstract: string;
+    discipline?: string;
+    methodology?: string;
+    objective?: string;
+    methods?: string;
+    findings?: string;
+    limitations?: string;
+  }) => {
+    const { data } = await apiClient.post('/manuscripts/ai/structured-draft', payload);
+    return data;
+  },
+  generateClinicalDraft: async (payload: {
+    title: string;
+    abstract: string;
+    discipline?: string;
+    methodology?: string;
+    condition: string;
+    intervention: string;
+    outcome: string;
+    notes?: string;
+  }) => {
+    const { data } = await apiClient.post('/manuscripts/ai/clinical-draft', payload);
     return data;
   },
 };

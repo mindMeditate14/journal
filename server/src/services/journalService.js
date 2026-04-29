@@ -1,4 +1,6 @@
 import Journal from '../models/Journal.js';
+import '../models/ClinicalEvidence.js';
+import '../models/Reference.js';
 import logger from '../utils/logger.js';
 
 export const createJournal = async (journalData, ownerId) => {

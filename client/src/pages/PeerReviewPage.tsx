@@ -9,6 +9,8 @@ export function PeerReviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [selectedWorkingDoc, setSelectedWorkingDoc] = useState<File | null>(null);
+  const [uploadingWorkingDoc, setUploadingWorkingDoc] = useState(false);
 
   const [formData, setFormData] = useState({
     score: 0,
@@ -73,6 +75,31 @@ export function PeerReviewPage() {
       }, 2000);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to submit review');
+    }
+  };
+
+  const handleUploadWorkingDocument = async () => {
+    if (!manuscriptId) return;
+    if (!selectedWorkingDoc) {
+      toast.error('Select a Word/PDF document first');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('document', selectedWorkingDoc);
+
+    try {
+      setUploadingWorkingDoc(true);
+      await apiClient.post(`/manuscripts/${manuscriptId}/working-document`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Working document updated for author/editor review.');
+      setSelectedWorkingDoc(null);
+      await fetchManuscript();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to upload working document');
+    } finally {
+      setUploadingWorkingDoc(false);
     }
   };
 
@@ -147,6 +174,56 @@ export function PeerReviewPage() {
               <p className="text-sm text-gray-600">Manuscript Preview</p>
               <div className="bg-gray-50 p-4 rounded max-h-48 overflow-y-auto text-sm">
                 {manuscript.body.substring(0, 1000)}...
+              </div>
+            </div>
+
+            {(manuscript.workingDocument?.url || manuscript.finalDocument?.url) && (
+              <div>
+                <p className="text-sm text-gray-600">Working Document</p>
+                <a
+                  href={manuscript.workingDocument?.url || manuscript.finalDocument?.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-indigo-700 underline"
+                >
+                  Open document for review
+                </a>
+              </div>
+            )}
+
+            {(manuscript.editorDecision || manuscript.editorNotes) && (
+              <div className="border border-amber-200 rounded-lg p-3 bg-amber-50">
+                <p className="text-sm text-amber-800 font-medium">Editorial Decision</p>
+                {manuscript.editorDecision && (
+                  <p className="text-sm text-amber-900 mt-1">
+                    Decision: {String(manuscript.editorDecision).replace('-', ' ')}
+                  </p>
+                )}
+                {manuscript.editorNotes && (
+                  <p className="text-sm text-amber-900 mt-1">Notes: {manuscript.editorNotes}</p>
+                )}
+              </div>
+            )}
+
+            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <p className="text-sm text-gray-700 mb-2">
+                Upload corrected Word/PDF document (track changes) for researcher/editor revision cycle.
+              </p>
+              <div className="flex flex-col md:flex-row gap-2">
+                <input
+                  type="file"
+                  accept="application/pdf,.doc,.docx"
+                  onChange={(e) => setSelectedWorkingDoc(e.target.files?.[0] || null)}
+                  className="text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleUploadWorkingDocument}
+                  disabled={uploadingWorkingDoc}
+                  className="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {uploadingWorkingDoc ? 'Uploading...' : 'Upload Corrected Document'}
+                </button>
               </div>
             </div>
           </div>

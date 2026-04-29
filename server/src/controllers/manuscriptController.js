@@ -1,8 +1,491 @@
 import Manuscript from '../models/Manuscript.js';
 import Paper from '../models/Paper.js';
 import Journal from '../models/Journal.js';
+import User from '../models/User.js';
+import mongoose from 'mongoose';
+import path from 'path';
+import fs from 'fs/promises';
 import logger from '../utils/logger.js';
 import { registerZenodoDOI } from '../utils/zenodoService.js';
+import { buildDraftQuality, extractPdfMetadata } from '../services/manuscriptDraftService.js';
+import {
+  generateClinicalDraft,
+  generateOutline,
+  generateSectionDraft,
+  generateStructuredDraft,
+} from '../services/manuscriptAiService.js';
+
+const toStringOrEmpty = (value) => (value === undefined || value === null ? '' : String(value).trim());
+
+const normalizeDraftPayload = (payload = {}) => {
+  const normalizedTitle = toStringOrEmpty(payload.title).slice(0, 300);
+  const normalizedAbstract = toStringOrEmpty(payload.abstract).slice(0, 1000);
+
+  const normalized = {
+    title: normalizedTitle,
+    abstract: normalizedAbstract,
+    body: toStringOrEmpty(payload.body),
+    content: toStringOrEmpty(payload.content),
+    discipline: toStringOrEmpty(payload.discipline),
+    methodology: toStringOrEmpty(payload.methodology),
+    fundingStatement: toStringOrEmpty(payload.fundingStatement),
+    conflictOfInterest: toStringOrEmpty(payload.conflictOfInterest),
+    dataAvailability: toStringOrEmpty(payload.dataAvailability),
+    sourcePath: payload.sourcePath || 'manual',
+    projectId: payload.projectId || undefined,
+    journalId: payload.journalId || undefined,
+    keywords: Array.isArray(payload.keywords)
+      ? payload.keywords.map((keyword) => String(keyword).trim()).filter(Boolean)
+      : [],
+    authors: Array.isArray(payload.authors)
+      ? payload.authors
+          .map((author) => ({
+            name: toStringOrEmpty(author?.name),
+            email: toStringOrEmpty(author?.email),
+            affiliation: toStringOrEmpty(author?.affiliation),
+            orcid: toStringOrEmpty(author?.orcid),
+          }))
+          .filter((author) => author.name || author.email)
+      : [],
+    metadata: payload.metadata || {},
+    extractionReport: payload.extractionReport || undefined,
+  };
+
+  if (normalized.authors.length === 0) {
+    normalized.authors = [{ name: '', email: '', affiliation: '', orcid: '' }];
+  }
+
+  const quality = buildDraftQuality(normalized);
+  return { ...normalized, ...quality };
+};
+
+const parseAuthorsInput = (rawAuthors = '') => {
+  if (Array.isArray(rawAuthors)) {
+    return rawAuthors;
+  }
+
+  return String(rawAuthors || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => ({ name, email: '' }));
+};
+
+const buildStoredDocumentPayload = async (file, userId) => {
+  const uploadsRoot = path.resolve(process.cwd(), '../public/uploads/manuscripts');
+  await fs.mkdir(uploadsRoot, { recursive: true });
+
+  const ext = path.extname(file.originalname || '') || '';
+  const safeBase = path
+    .basename(file.originalname || 'document', ext)
+    .replace(/[^a-zA-Z0-9-_]/g, '_')
+    .slice(0, 80);
+  const fileName = `${Date.now()}-${safeBase}${ext}`;
+  const absolutePath = path.join(uploadsRoot, fileName);
+
+  await fs.writeFile(absolutePath, file.buffer);
+
+  return {
+    originalName: file.originalname,
+    fileName,
+    mimeType: file.mimetype,
+    size: file.size,
+    url: `/uploads/manuscripts/${fileName}`,
+    uploadedAt: new Date(),
+    uploadedBy: userId,
+  };
+};
+
+const validateSubmissionPayload = ({ journalId, title, abstract, authors, body, discipline, methodology }) => {
+  if (!journalId || !title || !abstract || !authors || !body || !discipline || !methodology) {
+    return 'Missing required fields';
+  }
+
+  if (title.length < 10 || title.length > 300) {
+    return 'Title must be 10-300 characters';
+  }
+
+  if (abstract.length < 50 || abstract.length > 1000) {
+    return 'Abstract must be 50-1000 characters';
+  }
+
+  if (!Array.isArray(authors) || authors.length === 0) {
+    return 'At least one author required';
+  }
+
+  for (const author of authors) {
+    if (!author.name || !author.email) {
+      return 'Each author must have name and email';
+    }
+  }
+
+  if (body.length < 1000) {
+    return 'Manuscript body must be at least 1000 characters';
+  }
+
+  return null;
+};
+
+/**
+ * Extract metadata from uploaded PDF
+ * POST /api/manuscripts/extract-metadata
+ */
+export async function extractMetadataFromPdf(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'PDF file is required' });
+    }
+
+    if (req.file.mimetype !== 'application/pdf') {
+      return res.status(400).json({ error: 'Only PDF files are supported' });
+    }
+
+    const extracted = await extractPdfMetadata({
+      buffer: req.file.buffer,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+    });
+
+    res.json({
+      success: true,
+      extracted,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Create manuscript draft from any source payload
+ * POST /api/manuscripts/drafts
+ */
+export async function createDraft(req, res, next) {
+  try {
+    const payload = normalizeDraftPayload(req.body || {});
+    const manuscript = await Manuscript.create({
+      ...payload,
+      owner: req.user._id,
+      submittedBy: req.user._id,
+      status: 'draft',
+      version: 1,
+      lastEditedBy: req.user._id,
+      updatedAt: new Date(),
+    });
+
+    res.status(201).json({ success: true, manuscript });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Create draft directly from uploaded PDF
+ * POST /api/manuscripts/drafts/from-pdf
+ */
+export async function createDraftFromPdf(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'PDF file is required' });
+    }
+
+    if (req.file.mimetype !== 'application/pdf') {
+      return res.status(400).json({ error: 'Only PDF files are supported' });
+    }
+
+    const extracted = await extractPdfMetadata({
+      buffer: req.file.buffer,
+      fileName: req.file.originalname,
+      fileSize: req.file.size,
+    });
+
+    const payload = normalizeDraftPayload({
+      ...extracted,
+      ...req.body,
+      sourcePath: 'pdf_import',
+    });
+
+    const manuscript = await Manuscript.create({
+      ...payload,
+      owner: req.user._id,
+      submittedBy: req.user._id,
+      status: 'draft',
+      version: 1,
+      lastEditedBy: req.user._id,
+      updatedAt: new Date(),
+    });
+
+    res.status(201).json({ success: true, manuscript, extracted });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Submit an existing paper with attached document (PDF/Word) for editor review
+ * POST /api/manuscripts/submit-existing
+ */
+export async function submitExistingPaper(req, res, next) {
+  try {
+    const { journalId, title, abstract, description, discipline, methodology, keywords, authors } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Document file is required (PDF/Word).' });
+    }
+
+    if (!journalId || !title || !abstract) {
+      return res.status(400).json({ error: 'journalId, title, and abstract are required' });
+    }
+
+    const journal = await Journal.findById(journalId);
+    if (!journal) {
+      return res.status(404).json({ error: 'Journal not found' });
+    }
+
+    if (!journal.isOpen) {
+      return res.status(400).json({ error: 'This journal is not accepting submissions' });
+    }
+
+    const parsedKeywords = String(keywords || '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+    const parsedAuthors = parseAuthorsInput(authors);
+
+    const workingDocument = await buildStoredDocumentPayload(req.file, req.user._id);
+
+    const manuscript = await Manuscript.create({
+      title: String(title).trim().slice(0, 300),
+      abstract: String(abstract).trim().slice(0, 1000),
+      body: String(description || abstract || '').trim().slice(0, 12000).padEnd(1000, ' '),
+      sourcePath: 'existing_upload',
+      journalId,
+      keywords: parsedKeywords,
+      authors: parsedAuthors.length > 0 ? parsedAuthors : [{ name: req.user.email || 'Author', email: req.user.email || '' }],
+      discipline: String(discipline || 'General').trim(),
+      methodology: String(methodology || 'external-submission').trim(),
+      workingDocument,
+      status: 'submitted',
+      submittedAt: new Date(),
+      submittedBy: req.user._id,
+      owner: req.user._id,
+      validationState: 'ready_for_submission',
+      completenessScore: 100,
+      version: 1,
+      lastEditedBy: req.user._id,
+      metadata: {
+        extractionWarnings: ['Submitted as existing paper with attached source document.'],
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      manuscript: {
+        _id: manuscript._id,
+        submissionId: manuscript.submissionId,
+        status: manuscript.status,
+        title: manuscript.title,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Upload or replace final publication document for a manuscript
+ * POST /api/manuscripts/:id/final-document
+ */
+export async function uploadFinalDocument(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Document file is required.' });
+    }
+
+    const manuscript = await Manuscript.findById(req.params.id);
+    if (!manuscript) {
+      return res.status(404).json({ error: 'Manuscript not found' });
+    }
+
+    const userRoles = Array.isArray(req.roles) ? req.roles : [req.user.role].filter(Boolean);
+    const isPrivileged = userRoles.includes('admin') || userRoles.includes('editor');
+    const isOwner = manuscript.submittedBy?.toString() === req.user._id.toString();
+
+    if (!isPrivileged && !isOwner) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    if (!['accepted', 'published'].includes(manuscript.status)) {
+      return res.status(400).json({
+        error: 'Final publish document can only be uploaded after editorial acceptance',
+      });
+    }
+
+    if (req.file.mimetype !== 'application/pdf') {
+      return res.status(400).json({
+        error: 'Final publish document must be a PDF',
+      });
+    }
+
+    manuscript.finalDocument = await buildStoredDocumentPayload(req.file, req.user._id);
+    manuscript.lastEditedBy = req.user._id;
+    manuscript.updatedAt = new Date();
+    await manuscript.save();
+
+    res.json({
+      success: true,
+      finalDocument: manuscript.finalDocument,
+      manuscript: {
+        _id: manuscript._id,
+        status: manuscript.status,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Upload or replace editable working document (Word/PDF) before publication
+ * POST /api/manuscripts/:id/working-document
+ */
+export async function uploadWorkingDocument(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Document file is required.' });
+    }
+
+    const manuscript = await Manuscript.findById(req.params.id);
+    if (!manuscript) {
+      return res.status(404).json({ error: 'Manuscript not found' });
+    }
+
+    const userRoles = Array.isArray(req.roles) ? req.roles : [req.user.role].filter(Boolean);
+    const isPrivileged = userRoles.includes('admin') || userRoles.includes('editor');
+    const isOwner = manuscript.submittedBy?.toString() === req.user._id.toString();
+    const isInvitedReviewer = Array.isArray(manuscript.reviews)
+      && manuscript.reviews.some((review) => review.reviewerId?.toString() === req.user._id.toString());
+
+    if (!isPrivileged && !isOwner && !isInvitedReviewer) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    if (manuscript.status === 'published') {
+      return res.status(400).json({ error: 'Cannot change working document after publication' });
+    }
+
+    manuscript.workingDocument = await buildStoredDocumentPayload(req.file, req.user._id);
+
+    // Author revision upload should move manuscript back into editor queue.
+    if (isOwner && ['rejected', 'revision-requested'].includes(manuscript.status)) {
+      manuscript.status = 'submitted';
+      manuscript.submittedAt = new Date();
+      manuscript.editorDecision = undefined;
+      manuscript.editorNotes = '';
+    }
+
+    manuscript.lastEditedBy = req.user._id;
+    manuscript.updatedAt = new Date();
+    await manuscript.save();
+
+    res.json({
+      success: true,
+      workingDocument: manuscript.workingDocument,
+      manuscript: {
+        _id: manuscript._id,
+        status: manuscript.status,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Generate outline from partial manuscript context
+ * POST /api/manuscripts/ai/outline
+ */
+export async function generateAiOutline(req, res, next) {
+  try {
+    const { title, abstract, discipline, methodology, sourcePath } = req.body || {};
+
+    const result = await generateOutline({
+      title,
+      abstract,
+      discipline,
+      methodology,
+      sourcePath,
+    });
+
+    res.json({ success: true, outline: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Generate one manuscript section draft
+ * POST /api/manuscripts/ai/section
+ */
+export async function generateAiSection(req, res, next) {
+  try {
+    const { sectionType } = req.body || {};
+
+    if (!sectionType) {
+      return res.status(400).json({ error: 'sectionType is required' });
+    }
+
+    const result = await generateSectionDraft(req.body || {});
+    res.json({ success: true, section: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Generate full draft body from structured input
+ * POST /api/manuscripts/ai/structured-draft
+ */
+export async function generateAiStructuredDraft(req, res, next) {
+  try {
+    const { title, abstract, objective, methods, findings } = req.body || {};
+
+    if (!title || !abstract) {
+      return res.status(400).json({ error: 'title and abstract are required' });
+    }
+
+    if (!objective && !methods && !findings) {
+      return res.status(400).json({ error: 'At least one of objective, methods, or findings is required' });
+    }
+
+    const draft = await generateStructuredDraft(req.body || {});
+    res.json({ success: true, draft });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Generate full draft body from clinical case input
+ * POST /api/manuscripts/ai/clinical-draft
+ */
+export async function generateAiClinicalDraft(req, res, next) {
+  try {
+    const { title, abstract, condition, intervention, outcome } = req.body || {};
+
+    if (!title || !abstract) {
+      return res.status(400).json({ error: 'title and abstract are required' });
+    }
+
+    if (!condition || !intervention || !outcome) {
+      return res.status(400).json({ error: 'condition, intervention, and outcome are required' });
+    }
+
+    const draft = await generateClinicalDraft(req.body || {});
+    res.json({ success: true, draft });
+  } catch (error) {
+    next(error);
+  }
+}
 
 /**
  * Submit new manuscript
@@ -10,41 +493,71 @@ import { registerZenodoDOI } from '../utils/zenodoService.js';
  */
 export async function submitManuscript(req, res, next) {
   try {
-    const { journalId, title, abstract, keywords, authors, body, discipline, methodology, fundingStatement, conflictOfInterest, dataAvailability } = req.body;
+    const {
+      draftId,
+      journalId,
+      title,
+      abstract,
+      keywords,
+      authors,
+      body,
+      discipline,
+      methodology,
+      fundingStatement,
+      conflictOfInterest,
+      dataAvailability,
+    } = req.body;
 
-    // Validate required fields
-    if (!journalId || !title || !abstract || !authors || !body || !discipline || !methodology) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
+    let manuscript;
+    let finalPayload = {
+      journalId,
+      title,
+      abstract,
+      keywords: keywords || [],
+      authors,
+      body,
+      discipline,
+      methodology,
+      fundingStatement: fundingStatement || '',
+      conflictOfInterest: conflictOfInterest || '',
+      dataAvailability: dataAvailability || '',
+    };
 
-    // Validate title length
-    if (title.length < 10 || title.length > 300) {
-      return res.status(400).json({ error: 'Title must be 10-300 characters' });
-    }
-
-    // Validate abstract length
-    if (abstract.length < 50 || abstract.length > 1000) {
-      return res.status(400).json({ error: 'Abstract must be 50-1000 characters' });
-    }
-
-    // Validate authors
-    if (!Array.isArray(authors) || authors.length === 0) {
-      return res.status(400).json({ error: 'At least one author required' });
-    }
-
-    for (const author of authors) {
-      if (!author.name || !author.email) {
-        return res.status(400).json({ error: 'Each author must have name and email' });
+    if (draftId) {
+      manuscript = await Manuscript.findById(draftId);
+      if (!manuscript) {
+        return res.status(404).json({ error: 'Draft not found' });
       }
+
+      if (manuscript.submittedBy.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
+
+      finalPayload = {
+        journalId: journalId || manuscript.journalId,
+        title: title || manuscript.title,
+        abstract: abstract || manuscript.abstract,
+        keywords: Array.isArray(keywords) ? keywords : manuscript.keywords,
+        authors: Array.isArray(authors) && authors.length > 0 ? authors : manuscript.authors,
+        body: body || manuscript.body,
+        discipline: discipline || manuscript.discipline,
+        methodology: methodology || manuscript.methodology,
+        fundingStatement:
+          fundingStatement !== undefined ? fundingStatement : manuscript.fundingStatement || '',
+        conflictOfInterest:
+          conflictOfInterest !== undefined ? conflictOfInterest : manuscript.conflictOfInterest || '',
+        dataAvailability:
+          dataAvailability !== undefined ? dataAvailability : manuscript.dataAvailability || '',
+      };
     }
 
-    // Validate body length (minimum 1000 chars = ~150 words)
-    if (body.length < 1000) {
-      return res.status(400).json({ error: 'Manuscript body must be at least 1000 characters' });
+    const validationError = validateSubmissionPayload(finalPayload);
+    if (validationError) {
+      return res.status(400).json({ error: validationError });
     }
 
     // Verify journal exists
-    const journal = await Journal.findById(journalId);
+    const journal = await Journal.findById(finalPayload.journalId);
     if (!journal) {
       return res.status(404).json({ error: 'Journal not found' });
     }
@@ -54,23 +567,25 @@ export async function submitManuscript(req, res, next) {
       return res.status(400).json({ error: 'This journal is not accepting submissions' });
     }
 
-    // Create manuscript
-    const manuscript = new Manuscript({
-      journalId,
-      submittedBy: req.user._id,
-      title: title.trim(),
-      abstract: abstract.trim(),
-      keywords: keywords || [],
-      authors,
-      body: body.trim(),
-      discipline,
-      methodology,
-      fundingStatement: fundingStatement || '',
-      conflictOfInterest: conflictOfInterest || '',
-      dataAvailability: dataAvailability || '',
-      status: 'submitted',
-      submittedAt: new Date(),
-    });
+    if (!manuscript) {
+      manuscript = new Manuscript({
+        ...finalPayload,
+        submittedBy: req.user._id,
+        owner: req.user._id,
+      });
+    } else {
+      Object.assign(manuscript, finalPayload);
+    }
+
+    manuscript.title = manuscript.title.trim();
+    manuscript.abstract = manuscript.abstract.trim();
+    manuscript.body = manuscript.body.trim();
+    manuscript.status = 'submitted';
+    manuscript.submittedAt = new Date();
+    manuscript.validationState = 'ready_for_submission';
+    manuscript.completenessScore = Math.max(90, manuscript.completenessScore || 0);
+    manuscript.lastEditedBy = req.user._id;
+    manuscript.updatedAt = new Date();
 
     await manuscript.save();
 
@@ -78,9 +593,9 @@ export async function submitManuscript(req, res, next) {
     try {
       await sendSubmissionConfirmationEmail(
         req.user.email,
-        authors[0].name,
+        manuscript.authors[0].name,
         manuscript.submissionId,
-        title
+        manuscript.title
       );
     } catch (emailErr) {
       logger.warn(`Failed to send submission confirmation email: ${emailErr.message}`);
@@ -110,7 +625,29 @@ export async function listManuscripts(req, res, next) {
     const { status, journalId, limit = 20, page = 1 } = req.query;
     const skip = (page - 1) * limit;
 
-    const filter = { submittedBy: req.user._id };
+    const userRoles = Array.isArray(req.roles) ? req.roles : [req.user.role].filter(Boolean);
+    const isAdmin = userRoles.includes('admin');
+    const isEditor = userRoles.includes('editor');
+
+    const filter = {};
+
+    if (!isAdmin && !isEditor) {
+      filter.submittedBy = req.user._id;
+    }
+
+    if (isEditor && !isAdmin) {
+      const ownedJournals = await Journal.find({ owner: req.user._id }).select('_id').lean();
+      const ownedJournalIds = ownedJournals.map((journal) => journal._id);
+
+      filter.$or = [
+        { assignedEditor: req.user._id },
+        { assignedEditor: null },
+        { assignedEditor: { $exists: false } },
+      ];
+      if (ownedJournalIds.length > 0) {
+        filter.$or.push({ journalId: { $in: ownedJournalIds } });
+      }
+    }
 
     if (status) {
       const statusValues = String(status)
@@ -155,7 +692,7 @@ export async function viewManuscript(req, res, next) {
     const { id } = req.params;
 
     const manuscript = await Manuscript.findById(id)
-      .populate('journalId', 'title scope')
+      .populate('journalId', 'title scope owner')
       .populate('submittedBy', 'email name')
       .populate('assignedEditor', 'name email');
 
@@ -165,7 +702,9 @@ export async function viewManuscript(req, res, next) {
 
     // Authorization: author, editor, or admin
     const isAuthor = manuscript.submittedBy._id.toString() === req.user._id.toString();
-    const isEditor = manuscript.assignedEditor?._id?.toString() === req.user._id.toString();
+    const userRoles = Array.isArray(req.roles) ? req.roles : [req.user.role].filter(Boolean);
+    const hasEditorRole = userRoles.includes('editor') || userRoles.includes('admin');
+    const isEditor = manuscript.assignedEditor?._id?.toString() === req.user._id.toString() || hasEditorRole;
     const isJournalOwner = manuscript.journalId.owner?.toString() === req.user._id.toString();
     const isPublished = manuscript.status === 'published';
 
@@ -204,16 +743,33 @@ export async function updateManuscript(req, res, next) {
 
     const { title, abstract, keywords, authors, body, discipline, methodology, fundingStatement, conflictOfInterest, dataAvailability } = req.body;
 
-    if (title) manuscript.title = title.trim();
-    if (abstract) manuscript.abstract = abstract.trim();
-    if (keywords) manuscript.keywords = keywords;
-    if (authors) manuscript.authors = authors;
-    if (body) manuscript.body = body.trim();
-    if (discipline) manuscript.discipline = discipline;
-    if (methodology) manuscript.methodology = methodology;
+    if (title !== undefined) manuscript.title = title.trim();
+    if (abstract !== undefined) manuscript.abstract = abstract.trim();
+    if (keywords !== undefined) manuscript.keywords = keywords;
+    if (authors !== undefined) manuscript.authors = authors;
+    if (body !== undefined) manuscript.body = body.trim();
+    if (discipline !== undefined) manuscript.discipline = discipline;
+    if (methodology !== undefined) manuscript.methodology = methodology;
     if (fundingStatement !== undefined) manuscript.fundingStatement = fundingStatement;
     if (conflictOfInterest !== undefined) manuscript.conflictOfInterest = conflictOfInterest;
     if (dataAvailability !== undefined) manuscript.dataAvailability = dataAvailability;
+    if (req.body.sourcePath !== undefined) manuscript.sourcePath = req.body.sourcePath;
+    if (req.body.projectId !== undefined) manuscript.projectId = req.body.projectId;
+    if (req.body.journalId !== undefined) manuscript.journalId = req.body.journalId;
+    if (req.body.metadata !== undefined) manuscript.metadata = req.body.metadata;
+    if (req.body.extractionReport !== undefined) manuscript.extractionReport = req.body.extractionReport;
+
+    const quality = buildDraftQuality({
+      title: manuscript.title,
+      abstract: manuscript.abstract,
+      body: manuscript.body,
+      keywords: manuscript.keywords,
+      authors: manuscript.authors,
+      journalId: manuscript.journalId,
+    });
+    manuscript.completenessScore = quality.completenessScore;
+    manuscript.validationState = quality.validationState;
+    manuscript.lastEditedBy = req.user._id;
 
     manuscript.updatedAt = new Date();
     await manuscript.save();
@@ -221,6 +777,33 @@ export async function updateManuscript(req, res, next) {
     res.json({
       success: true,
       manuscript,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Return extraction report for draft review UI
+ * GET /api/manuscripts/:id/extraction-report
+ */
+export async function getExtractionReport(req, res, next) {
+  try {
+    const manuscript = await Manuscript.findById(req.params.id)
+      .select('submittedBy extractionReport metadata.extractionConfidence metadata.extractionWarnings');
+
+    if (!manuscript) {
+      return res.status(404).json({ error: 'Manuscript not found' });
+    }
+
+    if (manuscript.submittedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    res.json({
+      extractionReport: manuscript.extractionReport || null,
+      extractionConfidence: manuscript.metadata?.extractionConfidence || {},
+      extractionWarnings: manuscript.metadata?.extractionWarnings || [],
     });
   } catch (error) {
     next(error);
@@ -245,9 +828,31 @@ export async function assignReviewers(req, res, next) {
       return res.status(404).json({ error: 'Manuscript not found' });
     }
 
+    const normalizedReviewerIds = [...new Set(
+      reviewerIds.map((reviewerId) => String(reviewerId).trim()).filter(Boolean)
+    )];
+
+    const invalidReviewerId = normalizedReviewerIds.find(
+      (reviewerId) => !mongoose.Types.ObjectId.isValid(reviewerId)
+    );
+    if (invalidReviewerId) {
+      return res.status(400).json({
+        error: `Invalid reviewerId: ${invalidReviewerId}. Reviewer IDs must be valid Mongo ObjectIds.`,
+      });
+    }
+
+    if (!manuscript.journalId) {
+      return res.status(400).json({ error: 'Manuscript is not linked to a journal' });
+    }
+
     // Check authorization (editor or journal owner)
     const journal = await Journal.findById(manuscript.journalId);
-    const isEditor = manuscript.assignedEditor?.toString() === req.user._id.toString() || req.user.role === 'admin';
+    if (!journal) {
+      return res.status(404).json({ error: 'Journal not found for manuscript' });
+    }
+
+    const userRoles = Array.isArray(req.roles) ? req.roles : [req.user.role].filter(Boolean);
+    const isEditor = userRoles.includes('editor') || userRoles.includes('admin');
     const isJournalOwner = journal.owner.toString() === req.user._id.toString();
 
     if (!isEditor && !isJournalOwner) {
@@ -260,12 +865,14 @@ export async function assignReviewers(req, res, next) {
     }
 
     // Add reviewer invitations
-    for (const reviewerId of reviewerIds) {
-      const existingReview = manuscript.reviews.find(r => r.reviewerId.toString() === reviewerId);
+    for (const reviewerId of normalizedReviewerIds) {
+      const existingReview = manuscript.reviews.find(
+        (review) => review.reviewerId && review.reviewerId.toString() === reviewerId
+      );
 
       if (!existingReview) {
         manuscript.reviews.push({
-          reviewerId,
+          reviewerId: new mongoose.Types.ObjectId(reviewerId),
           reviewerName: '',
           score: null,
           recommendation: null,
@@ -274,6 +881,10 @@ export async function assignReviewers(req, res, next) {
           submittedAt: null,
         });
       }
+    }
+
+    if (!manuscript.assignedEditor) {
+      manuscript.assignedEditor = req.user._id;
     }
 
     manuscript.status = 'under-review';
@@ -292,6 +903,40 @@ export async function assignReviewers(req, res, next) {
         reviewCount: manuscript.reviews.length,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * List possible reviewer accounts for editor assignment UI
+ * GET /api/manuscripts/reviewer-candidates
+ */
+export async function listReviewerCandidates(req, res, next) {
+  try {
+    const { limit = 50 } = req.query;
+    const users = await User.find({
+      isActive: { $ne: false },
+      $or: [{ roles: { $in: ['researcher', 'editor', 'admin'] } }, { role: { $in: ['researcher', 'editor', 'admin'] } }],
+    })
+      .select('_id email role roles profile.firstName profile.lastName profile.affiliation')
+      .limit(Math.min(parseInt(limit, 10) || 50, 200))
+      .lean();
+
+    const candidates = users.map((user) => {
+      const firstName = user.profile?.firstName || '';
+      const lastName = user.profile?.lastName || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+      return {
+        _id: user._id,
+        name: fullName || user.email,
+        email: user.email,
+        affiliation: user.profile?.affiliation || '',
+        roles: Array.isArray(user.roles) && user.roles.length > 0 ? user.roles : [user.role].filter(Boolean),
+      };
+    });
+
+    res.json({ candidates });
   } catch (error) {
     next(error);
   }
@@ -436,11 +1081,28 @@ export async function publishManuscript(req, res, next) {
     }
 
     try {
-      // Register with Zenodo and get DOI
-      const doiResult = await registerZenodoDOI(manuscript, manuscript.journalId);
+      if (!manuscript.finalDocument?.url) {
+        return res.status(400).json({
+          error: 'Final PDF is required before publishing to search index',
+        });
+      }
 
-      // Save DOI
-      manuscript.doi = doiResult.doi;
+      if (manuscript.finalDocument?.mimeType !== 'application/pdf') {
+        return res.status(400).json({
+          error: 'Only a PDF can be used as the final published paper',
+        });
+      }
+
+      let doiResult = null;
+      try {
+        doiResult = await registerZenodoDOI(manuscript, manuscript.journalId);
+      } catch (doiError) {
+        logger.warn(`DOI registration skipped/failed, publishing with uploaded document only: ${doiError.message}`);
+      }
+
+      if (doiResult?.doi) {
+        manuscript.doi = doiResult.doi;
+      }
       manuscript.publishedAt = new Date();
       manuscript.status = 'published';
 
@@ -456,15 +1118,20 @@ export async function publishManuscript(req, res, next) {
         journal: manuscript.journalId.title,
         sourceProvenance: [
           {
-            source: 'nexusjournal-submission',
+            source: 'manual',
             sourceId: manuscript._id,
-            journalTitle: manuscript.journalId.title,
+            confidence: 0.98,
+            fetchedAt: new Date(),
           },
         ],
         keywords: manuscript.keywords,
-        discipline: manuscript.discipline,
-        openAccess: true,
-        pdfUrl: doiResult.url,
+        topics: manuscript.metadata?.sectionHeadings || [],
+        isOpenAccess: true,
+        urls: {
+          landing: manuscript.finalDocument.url,
+          source: manuscript.finalDocument.url,
+          pdf: manuscript.finalDocument.url,
+        },
       });
 
       // Send publication email to authors
@@ -478,7 +1145,7 @@ export async function publishManuscript(req, res, next) {
           _id: manuscript._id,
           title: manuscript.title,
           doi: manuscript.doi,
-          url: doiResult.url,
+          url: manuscript.finalDocument.url,
           publishedAt: manuscript.publishedAt,
         },
       });

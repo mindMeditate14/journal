@@ -157,11 +157,65 @@ export interface Manuscript {
   _id: string;
   title: string;
   abstract: string;
-  content: string;
+  content?: string;
+  body?: string;
   owner: string;
-  projectId: string;
-  status: 'draft' | 'in_progress' | 'ready_for_review' | 'submitted' | 'published';
+  projectId?: string;
+  sourcePath?: 'manual' | 'pdf_import' | 'ai_wizard' | 'clinical_case' | 'existing_upload';
+  status:
+    | 'draft'
+    | 'in_progress'
+    | 'ready_for_review'
+    | 'submitted'
+    | 'under-review'
+    | 'revision-requested'
+    | 'accepted'
+    | 'rejected'
+    | 'published';
   version: number;
+  submissionId?: string;
+  journalId?: string | { _id: string; title: string };
+  discipline?: string;
+  methodology?: string;
+  keywords?: string[];
+  completenessScore?: number;
+  validationState?: 'incomplete' | 'review_needed' | 'ready_for_submission';
+  metadata?: {
+    affiliations?: string[];
+    sectionHeadings?: string[];
+    references?: string[];
+    extractionWarnings?: string[];
+    extractionConfidence?: {
+      title?: number;
+      authors?: number;
+      abstract?: number;
+      keywords?: number;
+      references?: number;
+    };
+  };
+  extractionReport?: {
+    parser?: string;
+    fileName?: string;
+    fileSize?: number;
+    extractedAt?: string;
+    rawTextPreview?: string;
+  };
+  finalDocument?: {
+    originalName?: string;
+    fileName?: string;
+    mimeType?: string;
+    size?: number;
+    url?: string;
+    uploadedAt?: string;
+  };
+  workingDocument?: {
+    originalName?: string;
+    fileName?: string;
+    mimeType?: string;
+    size?: number;
+    url?: string;
+    uploadedAt?: string;
+  };
   sections: Array<{
     title: string;
     content: string;

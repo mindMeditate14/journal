@@ -23,6 +23,12 @@ const manuscriptSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    sourcePath: {
+      type: String,
+      enum: ['manual', 'pdf_import', 'ai_wizard', 'clinical_case', 'existing_upload'],
+      default: 'manual',
+      index: true,
+    },
     abstract: String,
     body: String,
     content: String,
@@ -64,6 +70,24 @@ const manuscriptSchema = new mongoose.Schema(
     fundingStatement: String,
     conflictOfInterest: String,
     dataAvailability: String,
+    finalDocument: {
+      originalName: String,
+      fileName: String,
+      mimeType: String,
+      size: Number,
+      url: String,
+      uploadedAt: Date,
+      uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    },
+    workingDocument: {
+      originalName: String,
+      fileName: String,
+      mimeType: String,
+      size: Number,
+      url: String,
+      uploadedAt: Date,
+      uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    },
     linkedClinicalData: [
       {
         caseId: { type: mongoose.Schema.Types.ObjectId, ref: 'CaseStudy' },
@@ -76,6 +100,46 @@ const manuscriptSchema = new mongoose.Schema(
         },
       },
     ],
+    metadata: {
+      correspondingAuthor: {
+        name: String,
+        email: String,
+      },
+      affiliations: [String],
+      sectionHeadings: [String],
+      references: [String],
+      citationDetails: {
+        doi: String,
+        rawCitation: String,
+      },
+      extractionConfidence: {
+        title: Number,
+        authors: Number,
+        abstract: Number,
+        keywords: Number,
+        references: Number,
+      },
+      extractionWarnings: [String],
+    },
+    extractionReport: {
+      parser: String,
+      fileName: String,
+      fileSize: Number,
+      extractedAt: Date,
+      rawTextPreview: String,
+    },
+    completenessScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0,
+    },
+    validationState: {
+      type: String,
+      enum: ['incomplete', 'review_needed', 'ready_for_submission'],
+      default: 'incomplete',
+      index: true,
+    },
     knowledgeGraph: {
       nodes: [
         {

@@ -4,6 +4,7 @@ import apiClient from '../api/client';
 
 export function EditorDashboardPage() {
   const [submissions, setSubmissions] = useState([]);
+  const [reviewerCandidates, setReviewerCandidates] = useState([]);
   const [selectedManuscript, setSelectedManuscript] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,21 +23,37 @@ export function EditorDashboardPage() {
   const [reviewerForm, setReviewerForm] = useState({
     reviewerIds: [],
   });
+  const [selectedWorkingDoc, setSelectedWorkingDoc] = useState<File | null>(null);
+  const [uploadingWorkingDoc, setUploadingWorkingDoc] = useState(false);
+  const [selectedFinalDoc, setSelectedFinalDoc] = useState<File | null>(null);
+  const [uploadingFinalDoc, setUploadingFinalDoc] = useState(false);
 
   useEffect(() => {
     fetchSubmissions();
+    fetchReviewerCandidates();
   }, []);
 
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
       // Fetch manuscripts where journal owner is current user
-      const response = await apiClient.get('/manuscripts?status=submitted,under-review,revision-requested');
+      const response = await apiClient.get('/manuscripts?status=submitted,under-review,revision-requested,accepted,published');
       setSubmissions(response.data.manuscripts);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReviewerCandidates = async () => {
+    try {
+      const response = await apiClient.get('/manuscripts/reviewer-candidates', {
+        params: { limit: 100 },
+      });
+      setReviewerCandidates(response.data?.candidates || []);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to load reviewer options');
     }
   };
 
@@ -107,6 +124,58 @@ export function EditorDashboardPage() {
       setSelectedManuscript(null);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to publish');
+    }
+  };
+
+  const handleUploadFinalDocument = async () => {
+    if (!selectedManuscript?._id) return;
+    if (!selectedFinalDoc) {
+      toast.error('Select a PDF/Word document first');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('document', selectedFinalDoc);
+
+    try {
+      setUploadingFinalDoc(true);
+      await apiClient.post(`/manuscripts/${selectedManuscript._id}/final-document`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Final document uploaded');
+      await handleSelectManuscript(selectedManuscript._id);
+      await fetchSubmissions();
+      setSelectedFinalDoc(null);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to upload final document');
+    } finally {
+      setUploadingFinalDoc(false);
+    }
+  };
+
+  const handleUploadWorkingDocument = async () => {
+    if (!selectedManuscript?._id) return;
+    if (!selectedWorkingDoc) {
+      toast.error('Select a Word/PDF document first');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('document', selectedWorkingDoc);
+
+    try {
+      setUploadingWorkingDoc(true);
+      await apiClient.post(`/manuscripts/${selectedManuscript._id}/working-document`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Working document uploaded');
+      await handleSelectManuscript(selectedManuscript._id);
+      await fetchSubmissions();
+      setSelectedWorkingDoc(null);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to upload working document');
+    } finally {
+      setUploadingWorkingDoc(false);
     }
   };
 
@@ -184,6 +253,34 @@ export function EditorDashboardPage() {
                     <p className="text-sm text-gray-600">Abstract</p>
                     <p className="text-gray-800">{selectedManuscript.abstract}</p>
                   </div>
+
+                  {selectedManuscript.workingDocument?.url && (
+                    <div>
+                      <p className="text-sm text-gray-600">Working Document</p>
+                      <a
+                        href={selectedManuscript.workingDocument.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-indigo-700 underline"
+                      >
+                        Open editable working document
+                      </a>
+                    </div>
+                  )}
+
+                  {selectedManuscript.finalDocument?.url && (
+                    <div>
+                      <p className="text-sm text-gray-600">Final Publication PDF</p>
+                      <a
+                        href={selectedManuscript.finalDocument.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-700 underline"
+                      >
+                        Open final PDF
+                      </a>
+                    </div>
+                  )}
 
                   <div>
                     <p className="text-sm text-gray-600">Manuscript Preview</p>
@@ -264,12 +361,15 @@ export function EditorDashboardPage() {
                         }
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       >
-                        {/* TODO: Populate from database */}
-                        <option value="reviewer1">Dr. Smith (Ayurveda)</option>
-                        <option value="reviewer2">Dr. Johnson (Medicine)</option>
-                        <option value="reviewer3">Dr. Williams (Research)</option>
+                        {reviewerCandidates.map((candidate) => (
+                          <option key={candidate._id} value={candidate._id}>
+                            {candidate.name} ({candidate.email})
+                          </option>
+                        ))}
                       </select>
-                      <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Hold Ctrl/Cmd to select multiple{reviewerCandidates.length === 0 ? ' (no reviewer accounts found)' : ''}
+                      </p>
                     </div>
 
                     <button
@@ -282,7 +382,7 @@ export function EditorDashboardPage() {
                 </div>
               )}
 
-              {selectedManuscript.status === 'under-review' && (
+              {(selectedManuscript.status === 'under-review' || selectedManuscript.status === 'revision-requested') && (
                 <div className="bg-white rounded-lg shadow p-6">
                   <h3 className="text-lg font-semibold mb-4">Make Editorial Decision</h3>
 
@@ -332,12 +432,70 @@ export function EditorDashboardPage() {
 
               {selectedManuscript.status === 'accepted' && (
                 <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold mb-3">Document Workflow</h3>
+                  <div className="mb-6 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <p className="text-gray-700 mb-3">
+                      Working document (Word/PDF) is used for reviewer/editor corrections before publication.
+                    </p>
+                    <div className="flex flex-col md:flex-row gap-2 mb-2">
+                      <input
+                        type="file"
+                        accept="application/pdf,.doc,.docx"
+                        onChange={(e) => setSelectedWorkingDoc(e.target.files?.[0] || null)}
+                        className="text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleUploadWorkingDocument}
+                        disabled={uploadingWorkingDoc}
+                        className="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        {uploadingWorkingDoc ? 'Uploading...' : 'Upload Working Document'}
+                      </button>
+                    </div>
+                    {selectedManuscript.workingDocument?.url && (
+                      <a
+                        href={selectedManuscript.workingDocument.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-indigo-700 underline text-sm"
+                      >
+                        Open current working document
+                      </a>
+                    )}
+                  </div>
+
                   <h3 className="text-lg font-semibold mb-4">Publish Manuscript</h3>
-                  <p className="text-gray-700 mb-4">
-                    This manuscript is accepted. Publishing will assign a DOI via Zenodo.
-                  </p>
+                  {!selectedManuscript.finalDocument?.url ? (
+                    <>
+                      <p className="text-gray-700 mb-3">
+                        Final PDF is required before publishing this paper to search.
+                      </p>
+                      <div className="flex flex-col md:flex-row gap-2 mb-4">
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          onChange={(e) => setSelectedFinalDoc(e.target.files?.[0] || null)}
+                          className="text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleUploadFinalDocument}
+                          disabled={uploadingFinalDoc}
+                          className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {uploadingFinalDoc ? 'Uploading...' : 'Upload Final Document'}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-gray-700 mb-4">
+                      Final document ready. You can publish this accepted paper to search now.
+                    </p>
+                  )}
                   <button
                     onClick={handlePublish}
+                    disabled={!selectedManuscript.finalDocument?.url}
                     className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 font-medium"
                   >
                     📤 Publish & Assign DOI
