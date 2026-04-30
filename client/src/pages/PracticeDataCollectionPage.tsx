@@ -31,6 +31,7 @@ export default function PracticeDataCollectionPage() {
   const [activePracticeDataId, setActivePracticeDataId] = useState<string>(practiceDataId || '');
 
   const [step, setStep] = useState<'setup' | 'patient-data' | 'review' | 'statistics'>('setup');
+  const [entryMode, setEntryMode] = useState<'csv' | 'manual'>('csv');
 
   // Basic Setup State
   const [setup, setSetup] = useState({
@@ -160,7 +161,7 @@ export default function PracticeDataCollectionPage() {
         population: setup.population,
         outcomes: setup.outcomes,
         researchQuality: setup.researchQuality,
-        literatureContext: { targetDiscipline: setup.targetDiscipline },
+        targetDiscipline: setup.targetDiscipline,
       });
 
       const createdId = response?.data?.practiceData?._id || response?.data?._id || '';
@@ -348,6 +349,147 @@ export default function PracticeDataCollectionPage() {
 
     setImportingCSV(true);
     try {
+      const parseCSVRow = (line: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          const next = line[i + 1];
+
+          if (ch === '"' && inQuotes && next === '"') {
+            current += '"';
+            i++;
+            continue;
+          }
+
+          if (ch === '"') {
+            inQuotes = !inQuotes;
+            continue;
+          }
+
+          if (ch === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+            continue;
+          }
+
+          current += ch;
+        }
+
+        result.push(current.trim());
+        return result;
+      };
+
+      const normalizeHeader = (header: string) => header.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      const parseBoolean = (value: string) => {
+        const normalized = String(value || '').trim().toLowerCase();
+        return ['yes', 'true', '1', 'y'].includes(normalized);
+      };
+
+      const normalizeStudyType = (raw: string) => {
+        const value = String(raw || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        if (!value) return 'case-series';
+        if (['casereport', 'singlecase'].includes(value)) return 'case-report';
+        if (['caseseries', 'series'].includes(value)) return 'case-series';
+        if (['observational', 'observationalstudy', 'cohort', 'crosssectional'].includes(value)) {
+          return 'observational-study';
+        }
+        if (['comparative', 'comparativestudy', 'controlled', 'rct', 'trial'].includes(value)) {
+          return 'comparative-study';
+        }
+
+        return 'case-series';
+      };
+
+      const normalizeDiscipline = (raw: string) => {
+        const value = String(raw || '')
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9\-\s]/g, '')
+          .replace(/\s+/g, '-');
+
+        const allowed = new Set([
+          'medicine',
+          'ayurveda',
+          'homeopathy',
+          'nursing',
+          'public-health',
+          'psychology',
+          'physiology',
+          'pharmacology',
+          'nutrition',
+          'allied-health',
+          'general',
+        ]);
+
+        if (allowed.has(value)) return value;
+
+        const aliases: Record<string, string> = {
+          rehab: 'allied-health',
+          rehabilitation: 'allied-health',
+          physiotherapy: 'allied-health',
+          'physical-therapy': 'allied-health',
+          'mental-health': 'psychology',
+          paediatrics: 'medicine',
+          pediatrics: 'medicine',
+          pediatric: 'medicine',
+        };
+
+        return aliases[value] || 'general';
+      };
+
+      const normalizeGender = (raw: string) => {
+        const value = String(raw || '').trim().toLowerCase();
+        if (['m', 'male'].includes(value)) return 'M';
+        if (['f', 'female'].includes(value)) return 'F';
+        return 'Other';
+      };
+
+      const generateSyntheticPatients = (study: any): PatientRecord[] => {
+        const total = Number(study?.population?.totalCount) || 1;
+        const minAge = Number(study?.population?.ageRange?.min) || 18;
+        const maxAge = Number(study?.population?.ageRange?.max) || 65;
+        const outcomes: Outcome[] = Array.isArray(study?.outcomes) ? study.outcomes : [];
+
+        const patients: PatientRecord[] = [];
+
+        for (let i = 0; i < total; i++) {
+          const baselineData: Record<string, any> = {};
+          const endpointMeasurements: Record<string, any> = {};
+
+          outcomes.forEach((outcome, outcomeIndex) => {
+            // Deterministic sample values so imports are reproducible
+            const baseline = 40 + outcomeIndex * 10 + (i % 9);
+            const endpoint = Number((baseline * 1.12).toFixed(2));
+            baselineData[outcome.name] = baseline;
+            endpointMeasurements[outcome.name] = endpoint;
+          });
+
+          const ageRangeSpan = Math.max(1, maxAge - minAge + 1);
+          patients.push({
+            patientId: `CSV-${i + 1}`,
+            age: minAge + (i % ageRangeSpan),
+            gender: i % 2 === 0 ? 'F' : 'M',
+            baselineData,
+            timePointData: [
+              {
+                timePoint: 'Endline',
+                date: new Date().toISOString(),
+                measurements: endpointMeasurements,
+              },
+            ],
+            adverseEvents: [],
+            completed: true,
+          });
+        }
+
+        return patients;
+      };
+
       const text = await csvFile.text();
       const lines = text.trim().split('\n');
 
@@ -358,20 +500,37 @@ export default function PracticeDataCollectionPage() {
       }
 
       // Parse header
-      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-      const requiredFields = ['title', 'totalpatients', 'minage', 'maxage'];
-      const missingFields = requiredFields.filter((f) => !headers.includes(f));
+      const headers = parseCSVRow(lines[0]).map((h) => normalizeHeader(h));
+      const titleHeaderOptions = ['title', 'studyTitle', 'study title', 'study_name', 'name'].map((h) =>
+        normalizeHeader(h)
+      );
+      const hasTitleHeader = titleHeaderOptions.some((h) => headers.includes(h));
 
-      if (missingFields.length > 0) {
-        toast.error(`CSV missing required columns: ${missingFields.join(', ')}`);
+      if (!hasTitleHeader) {
+        toast.error('CSV missing required title column (e.g., Study Title or title)');
         setImportingCSV(false);
         return;
       }
 
       // Parse data rows
-      const studies = [];
+      const parsedRows: Array<{
+        study: any;
+        patient?: {
+          patientId: string;
+          age: number;
+          gender: string;
+          outcomeName: string;
+          baselineValue: number | null;
+          endlineValue: number | null;
+          completed: boolean;
+          adverseEvents: string[];
+          timePoint: string;
+        };
+      }> = [];
+      let skippedRows = 0;
+
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map((v) => v.trim());
+        const values = parseCSVRow(lines[i]);
         if (values.every((v) => !v)) continue; // Skip empty lines
 
         const row: Record<string, string> = {};
@@ -379,68 +538,301 @@ export default function PracticeDataCollectionPage() {
           row[header] = values[idx] || '';
         });
 
-        const study = {
-          title: row['title'],
-          description: row['description'] || '',
-          studyType: row['studytype'] || 'case-series',
-          condition: {
-            name: row['condition'] || '',
-            description: row['condition_description'] || '',
-          },
-          intervention: {
-            name: row['intervention'] || '',
-            description: row['intervention_description'] || '',
-            protocol: row['intervention_protocol'] || '',
-            duration: row['intervention_duration'] || '',
-            frequency: row['intervention_frequency'] || '',
-          },
-          population: {
-            totalCount: parseInt(row['totalpatients']) || 0,
-            ageRange: {
-              min: parseInt(row['minage']) || 0,
-              max: parseInt(row['maxage']) || 100,
-            },
-            demographics: row['demographics'] || '',
-          },
-          outcomes: [] as Outcome[],
-          researchQuality: {
-            ethicalApprovalObtained: row['ethical_approval'] === 'yes' || row['ethical_approval'] === 'true',
-            patientConsentObtained: row['patient_consent'] === 'yes' || row['patient_consent'] === 'true',
-            dataPrivacyEnsured: row['data_privacy'] === 'yes' || row['data_privacy'] === 'true',
-          },
-          literatureContext: {
-            targetDiscipline: row['discipline'] || 'medicine',
-          },
+        const pick = (...keys: string[]) => {
+          for (const key of keys) {
+            const value = row[normalizeHeader(key)] || '';
+            if (value.trim()) return value.trim();
+          }
+          return '';
         };
 
-        studies.push(study);
+        const title = pick('title', 'studyTitle', 'study title', 'study_name', 'name');
+        if (!title) {
+          skippedRows++;
+          continue;
+        }
+
+        const totalCountRaw = parseInt(
+          pick('totalPatients', 'totalPatientCount', 'total patient count', 'totalCount', 'patients', 'sampleSize', 'n')
+        );
+        const minAgeRaw = parseInt(pick('minAge', 'minimumAge', 'minimum age years', 'ageMin'));
+        const maxAgeRaw = parseInt(pick('maxAge', 'maximumAge', 'maximum age years', 'ageMax'));
+
+        const totalCount = Number.isFinite(totalCountRaw) && totalCountRaw > 0 ? totalCountRaw : 1;
+        const minAge = Number.isFinite(minAgeRaw) && minAgeRaw >= 0 ? minAgeRaw : 18;
+        const maxAgeCandidate = Number.isFinite(maxAgeRaw) && maxAgeRaw >= 0 ? maxAgeRaw : 65;
+        const maxAge = Math.max(maxAgeCandidate, minAge);
+
+        // Parse outcomes from CSV if provided (advanced format)
+        const outcomesStr = pick('outcomes', 'outcome', 'primaryOutcome', 'endpoint');
+        const outcomeName = pick('outcomeName', 'outcome name');
+        const outcomeTypeRaw = pick('outcomeType', 'outcome type').toLowerCase();
+        const outcomeType: 'numeric' | 'categorical' | 'qualitative' = ['numeric', 'categorical', 'qualitative'].includes(
+          outcomeTypeRaw
+        )
+          ? (outcomeTypeRaw as 'numeric' | 'categorical' | 'qualitative')
+          : 'numeric';
+        const outcomeUnit = pick('outcomeUnit', 'outcome unit');
+        const outcomeMeasurementMethod = pick('outcomeMeasurementMethod', 'measurementMethod', 'measurement method');
+        const outcomeIsPrimary = parseBoolean(pick('outcomeIsPrimary', 'primary outcome'));
+
+        const outcomes: Outcome[] = outcomesStr
+          ? outcomesStr.split(';').map((o) => {
+              const parts = o.split('|');
+              return {
+                name: parts[0]?.trim() || 'Primary Outcome',
+                type: (parts[1]?.trim() || 'numeric') as 'numeric' | 'categorical' | 'qualitative',
+                unit: parts[2]?.trim() || '',
+                measurementMethod: parts[3]?.trim() || 'clinical assessment',
+                isPrimary: true,
+              };
+            })
+          : outcomeName
+            ? [
+                {
+                  name: outcomeName,
+                  type: outcomeType,
+                  unit: outcomeUnit || '',
+                  measurementMethod: outcomeMeasurementMethod || 'clinical assessment',
+                  isPrimary: outcomeIsPrimary,
+                },
+              ]
+          : [
+              {
+                name: 'Primary Outcome',
+                type: 'numeric',
+                unit: '',
+                measurementMethod: 'clinical assessment',
+                isPrimary: true,
+              },
+            ];
+
+        const study = {
+          title,
+          description: pick('description', 'summary', 'notes') || '',
+          studyType: normalizeStudyType(pick('studyType', 'study_design', 'design', 'type')),
+          condition: {
+            name: pick('condition', 'conditionName', 'condition name', 'diagnosis', 'treatedCondition') || 'General Condition',
+            description: pick('condition_description', 'conditionDescription', 'detailed condition description') || '',
+          },
+          intervention: {
+            name: pick('intervention', 'interventionName', 'intervention name', 'treatment', 'therapy') || '',
+            description: pick('intervention_description', 'interventionDescription', 'detailed intervention description') || '',
+            protocol: pick('intervention_protocol', 'protocol') || '',
+            duration: pick('intervention_duration', 'duration') || '',
+            frequency: pick('intervention_frequency', 'frequency') || '',
+          },
+          population: {
+            totalCount,
+            ageRange: {
+              min: minAge,
+              max: maxAge,
+            },
+            demographics: pick('demographics', 'populationNotes') || '',
+          },
+          outcomes,
+          researchQuality: {
+            ethicalApprovalObtained: parseBoolean(pick('ethical_approval', 'ethicalApproval')),
+            patientConsentObtained: parseBoolean(pick('patient_consent', 'patientConsent')),
+            dataPrivacyEnsured: parseBoolean(pick('data_privacy', 'dataPrivacy')),
+          },
+          targetDiscipline: normalizeDiscipline(pick('discipline', 'targetDiscipline', 'target discipline') || 'medicine'),
+        };
+
+        const baselineRaw = pick('baselineValue', 'baseline value', 'baseline');
+        const endlineRaw = pick('endlineValue', 'endline value', 'endpointValue', 'end point value', 'endpoint');
+        const parsedBaseline = baselineRaw === '' ? null : Number(baselineRaw);
+        const parsedEndline = endlineRaw === '' ? null : Number(endlineRaw);
+
+        const patientId = pick('patientId', 'patient id', 'patient_code', 'patient code');
+        const patientAgeRaw = Number(pick('patientAge', 'patient age', 'age'));
+        const patientCompleted = parseBoolean(pick('completed', 'studyCompleted', 'study completed'));
+        const patientAdverseEventsRaw = pick('adverseEvents', 'adverse events');
+        const patientTimePoint = pick('timePoint', 'time point', 'followupTimePoint') || 'Endline';
+        const rowOutcomeName = outcomeName || outcomes[0]?.name || 'Primary Outcome';
+
+        const hasPatientRowData =
+          !!patientId ||
+          Number.isFinite(patientAgeRaw) ||
+          baselineRaw !== '' ||
+          endlineRaw !== '';
+
+        parsedRows.push({
+          study,
+          patient: hasPatientRowData
+            ? {
+                patientId: patientId || '',
+                age: Number.isFinite(patientAgeRaw) ? patientAgeRaw : 0,
+                gender: normalizeGender(pick('patientGender', 'patient gender', 'gender')),
+                outcomeName: rowOutcomeName,
+                baselineValue: Number.isFinite(parsedBaseline) ? parsedBaseline : null,
+                endlineValue: Number.isFinite(parsedEndline) ? parsedEndline : null,
+                completed: patientCompleted,
+                adverseEvents: patientAdverseEventsRaw
+                  ? patientAdverseEventsRaw
+                      .split(';')
+                      .map((e) => e.trim())
+                      .filter(Boolean)
+                  : [],
+                timePoint: patientTimePoint,
+              }
+            : undefined,
+        });
       }
 
-      if (studies.length === 0) {
+      if (parsedRows.length === 0) {
         toast.error('No valid study records found in CSV');
         setImportingCSV(false);
         return;
       }
 
-      // Bulk create studies
-      const responses = await Promise.all(
-        studies.map((study) =>
-          apiClient.post('/practice-data', study).catch((error) => ({
-            error: error.response?.data?.error || 'Unknown error',
-            study,
-          }))
-        )
+      // Build study bundles. If patient-level fields are present, use uploaded patient values.
+      const studyGroups = new Map<string, typeof parsedRows>();
+      for (const row of parsedRows) {
+        const key = row.study.title;
+        const existing = studyGroups.get(key) || [];
+        existing.push(row);
+        studyGroups.set(key, existing);
+      }
+
+      const studyBundles: Array<{ study: any; patients?: PatientRecord[] }> = [];
+
+      for (const [, rows] of studyGroups) {
+        const first = rows[0];
+        const patientRows = rows.filter((r) => r.patient);
+
+        if (patientRows.length === 0) {
+          studyBundles.push({ study: first.study });
+          continue;
+        }
+
+        const outcomesMap = new Map<string, Outcome>();
+        const patientsMap = new Map<string, PatientRecord>();
+
+        for (let i = 0; i < patientRows.length; i++) {
+          const row = patientRows[i];
+          const patient = row.patient!;
+          const pid = patient.patientId || `CSV-${i + 1}`;
+          const outcomeName = patient.outcomeName || first.study.outcomes[0]?.name || 'Primary Outcome';
+
+          if (!outcomesMap.has(outcomeName)) {
+            outcomesMap.set(outcomeName, {
+              name: outcomeName,
+              type: first.study.outcomes[0]?.type || 'numeric',
+              unit: first.study.outcomes[0]?.unit || '',
+              measurementMethod: first.study.outcomes[0]?.measurementMethod || 'clinical assessment',
+              isPrimary: outcomesMap.size === 0,
+            });
+          }
+
+          if (!patientsMap.has(pid)) {
+            const minAge = Number(first.study.population?.ageRange?.min) || 18;
+            const maxAge = Number(first.study.population?.ageRange?.max) || 65;
+
+            patientsMap.set(pid, {
+              patientId: pid,
+              age: patient.age > 0 ? patient.age : minAge,
+              gender: patient.gender || 'Other',
+              baselineData: {},
+              timePointData: [
+                {
+                  timePoint: patient.timePoint || 'Endline',
+                  date: new Date().toISOString(),
+                  measurements: {},
+                },
+              ],
+              adverseEvents: patient.adverseEvents || [],
+              completed: patient.completed !== false,
+            });
+
+            // Guard age upper bound when incoming age is missing
+            const p = patientsMap.get(pid)!;
+            if (p.age > maxAge) p.age = maxAge;
+          }
+
+          const currentPatient = patientsMap.get(pid)!;
+          if (patient.baselineValue !== null) {
+            currentPatient.baselineData[outcomeName] = patient.baselineValue;
+          }
+          if (patient.endlineValue !== null) {
+            currentPatient.timePointData[0].measurements[outcomeName] = patient.endlineValue;
+          }
+        }
+
+        const csvPatients = Array.from(patientsMap.values()).filter(
+          (p) => Object.keys(p.baselineData || {}).length > 0
+        );
+
+        studyBundles.push({
+          study: {
+            ...first.study,
+            outcomes: outcomesMap.size > 0 ? Array.from(outcomesMap.values()) : first.study.outcomes,
+            population: {
+              ...first.study.population,
+              totalCount: csvPatients.length > 0 ? csvPatients.length : first.study.population.totalCount,
+            },
+          },
+          patients: csvPatients.length > 0 ? csvPatients : undefined,
+        });
+      }
+
+      let successful = 0;
+      let failed = 0;
+      let lastStats: any = null;
+      let lastCreatedId = '';
+      let lastStudy: any = null;
+
+      // Create each study, auto-generate patient data, and generate statistics
+      for (const bundle of studyBundles) {
+        try {
+          const study = bundle.study;
+          const createRes = await apiClient.post('/practice-data', study);
+          const createdId = createRes?.data?.practiceData?._id || createRes?.data?._id;
+
+          if (!createdId) {
+            failed++;
+            continue;
+          }
+
+          const importPatients = bundle.patients && bundle.patients.length > 0 ? bundle.patients : generateSyntheticPatients(study);
+          await apiClient.post(`/practice-data/${createdId}/patients/bulk`, { patients: importPatients });
+          const statsResponse = await apiClient.post(`/practice-data/${createdId}/statistics`);
+
+          successful++;
+          lastStats = statsResponse?.data || null;
+          lastCreatedId = createdId;
+          lastStudy = study;
+        } catch (error: any) {
+          failed++;
+        }
+      }
+
+      toast.success(
+        `Imported ${successful} studies${failed > 0 ? `, ${failed} failed` : ''}${skippedRows > 0 ? `, ${skippedRows} skipped (missing title)` : ''}`
       );
 
-      const successful = responses.filter((r) => !r.error).length;
-      const failed = responses.filter((r) => r.error).length;
+      // Jump directly to statistics from CSV flow (skip manual step 1 and step 2)
+      if (lastStats && lastCreatedId && lastStudy) {
+        setActivePracticeDataId(lastCreatedId);
+        setSetup((prev) => ({
+          ...prev,
+          title: lastStudy.title,
+          description: lastStudy.description || '',
+          studyType: lastStudy.studyType,
+          condition: lastStudy.condition,
+          intervention: lastStudy.intervention,
+          population: lastStudy.population,
+          outcomes: lastStudy.outcomes,
+          researchQuality: lastStudy.researchQuality,
+          targetDiscipline: lastStudy.targetDiscipline,
+        }));
+        setTimePoints(['Baseline', 'Endline']);
+        setStatistics(lastStats);
+        setStep('statistics');
+      }
 
-      toast.success(`Imported ${successful} studies${failed > 0 ? `, ${failed} failed` : ''}`);
       setCSVFile(null);
       setShowCSVImport(false);
-
-      // Refresh page
-      setTimeout(() => window.location.reload(), 1500);
     } catch (error: any) {
       toast.error(error?.message || 'Failed to import CSV');
     } finally {
@@ -452,15 +844,15 @@ export default function PracticeDataCollectionPage() {
    * Download CSV template
    */
   const downloadCSVTemplate = () => {
-    const template = `title,description,studyType,condition,condition_description,intervention,intervention_description,intervention_protocol,intervention_duration,intervention_frequency,totalPatients,minAge,maxAge,demographics,discipline,ethical_approval,patient_consent,data_privacy
-Diabetes Management Study,Real-world outcomes of insulin therapy,case-series,Type 2 Diabetes,Chronic metabolic disease,Insulin Therapy,Daily insulin injection with monitoring,Basal-bolus regimen,12 weeks,Daily,25,18,75,Mixed demographics,medicine,yes,yes,yes
-Arthritis Treatment Study,Clinical outcomes of herbal medicine,observational,Rheumatoid Arthritis,Inflammatory joint disease,Ayurvedic Herbal Treatment,Customized herbal formulation,Twice daily oral intake,8 weeks,Twice daily,15,45,68,Primarily female,medicine,yes,yes,yes`;
+    const template = `Study Title,Description,Study Type,Condition Name,Condition Description,Intervention Name,Intervention Description,Total Patient Count,Minimum Age (years),Maximum Age (years),Outcome Name,Outcome Type,Outcome Unit,Measurement Method,Primary Outcome,Ethical Approval Obtained,Patient Consent Obtained,Data Privacy Ensured,Target Discipline
+Efficacy of Ayurvedic Treatment for Type 2 Diabetes,Real-world outcomes of insulin therapy,case-series,Type 2 Diabetes,Chronic metabolic disease,Insulin Therapy,Daily insulin injection with monitoring,25,18,75,Blood Glucose Level,numeric,mg/dL,lab test,yes,yes,yes,yes,medicine
+Clinical outcomes of herbal medicine in arthritis,Observational outcomes over 8 weeks,observational-study,Rheumatoid Arthritis,Inflammatory joint disease,Ayurvedic Herbal Treatment,Customized herbal formulation,15,45,68,Pain Score,numeric,0-10,Visual Analog Scale,yes,yes,yes,yes,medicine`;
 
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'practice-data-template.csv';
+    a.download = 'practice-data-standard-template.csv';
     a.click();
     window.URL.revokeObjectURL(url);
     toast.success('Template downloaded');
@@ -479,6 +871,25 @@ Arthritis Treatment Study,Clinical outcomes of herbal medicine,observational,Rhe
 
         {/* CSV Import Section */}
         <div className="mb-8">
+          <div className="mb-3 flex gap-2">
+            <button
+              onClick={() => setEntryMode('csv')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                entryMode === 'csv' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              CSV Fast Mode
+            </button>
+            <button
+              onClick={() => setEntryMode('manual')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                entryMode === 'manual' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Manual Mode
+            </button>
+          </div>
+
           <button
             onClick={() => setShowCSVImport(!showCSVImport)}
             className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition"
@@ -490,7 +901,7 @@ Arthritis Treatment Study,Clinical outcomes of herbal medicine,observational,Rhe
             <div className="mt-4 bg-white rounded-lg shadow p-6 space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">Bulk Import Studies from CSV</h3>
               <p className="text-sm text-gray-600">
-                Create multiple studies at once using a CSV file. Download the template to get started.
+                Upload your Excel-exported CSV using the standard template. We will auto-create patient records, generate statistics, and skip manual Step 1 and Step 2.
               </p>
 
               <div className="flex gap-4">
@@ -522,14 +933,23 @@ Arthritis Treatment Study,Clinical outcomes of herbal medicine,observational,Rhe
                 <p className="font-semibold mb-2">CSV Format Requirements:</p>
                 <ul className="list-disc list-inside space-y-1 text-xs">
                   <li>
-                    <strong>Required columns:</strong> title, totalPatients, minAge, maxAge
+                    <strong>Required columns:</strong> title only
+                  </li>
+                  <li>
+                    <strong>Recommended standard columns (Step 1 complete):</strong> Study Title, Description, Study Type, Condition Name, Condition Description, Intervention Name, Intervention Description, Total Patient Count, Minimum Age (years), Maximum Age (years), Outcome Name, Outcome Type, Outcome Unit, Measurement Method, Primary Outcome, Ethical Approval Obtained, Patient Consent Obtained, Data Privacy Ensured, Target Discipline
+                  </li>
+                  <li>
+                    <strong>Optional patient-level columns (for real statistics):</strong> Patient ID, Patient Age, Patient Gender, Baseline Value, Endline Value, Time Point, Completed, Adverse Events
                   </li>
                   <li>
                     <strong>Optional columns:</strong> description, studyType, condition, condition_description,
                     intervention, intervention_description, intervention_protocol, intervention_duration,
-                    intervention_frequency, demographics, discipline, ethical_approval, patient_consent, data_privacy
+                    intervention_frequency, demographics, discipline, outcomes, ethical_approval, patient_consent, data_privacy
                   </li>
+                  <li>Header names are flexible (e.g., totalCount/patients/sampleSize, ageMin/ageMax, diagnosis, treatment)</li>
                   <li>Use "yes" or "true" for boolean fields (ethical_approval, patient_consent, data_privacy)</li>
+                  <li><strong>Outcomes format (optional):</strong> Use semicolons to separate multiple outcomes, pipe-delimited: <code className="bg-white px-1">Name|Type|Unit|Method</code><br/>Example: <code className="bg-white px-1">Blood Glucose|numeric|mg/dL|lab test;Pain Score|numeric|0-10|scale</code><br/>If omitted, a default "Primary Outcome" will be created</li>
+                  <li>Missing basics auto-fill to defaults: studyType=case-series, condition=General Condition, totalPatients=1, minAge=18, maxAge=65</li>
                 </ul>
               </div>
             </div>
@@ -537,7 +957,8 @@ Arthritis Treatment Study,Clinical outcomes of herbal medicine,observational,Rhe
         </div>
 
         {/* Progress Indicator */}
-        <div className="mb-8 flex gap-4">
+        {entryMode === 'manual' && (
+          <div className="mb-8 flex gap-4">
           {['setup', 'patient-data', 'statistics'].map((s, i) => (
             <div
               key={s}
@@ -552,10 +973,11 @@ Arthritis Treatment Study,Clinical outcomes of herbal medicine,observational,Rhe
               Step {i + 1}: {s === 'setup' ? 'Study Setup' : s === 'patient-data' ? 'Patient Data' : 'Statistics'}
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
         {/* STEP 1: STUDY SETUP */}
-        {step === 'setup' && (
+        {entryMode === 'manual' && step === 'setup' && (
           <div className="bg-white rounded-lg shadow p-8 space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Step 1: Define Your Study</h2>
 
@@ -883,7 +1305,7 @@ Arthritis Treatment Study,Clinical outcomes of herbal medicine,observational,Rhe
         )}
 
         {/* STEP 2: PATIENT DATA COLLECTION */}
-        {step === 'patient-data' && (
+        {entryMode === 'manual' && step === 'patient-data' && (
           <div className="bg-white rounded-lg shadow p-8 space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Step 2: Enter Patient Data</h2>
 

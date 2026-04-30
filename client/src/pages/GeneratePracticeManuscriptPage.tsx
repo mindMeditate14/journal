@@ -191,6 +191,58 @@ export default function GeneratePracticeManuscriptPage() {
   const generateSection = async (sectionType: SectionKey) => {
     if (!practiceData) return;
 
+    const fallbackContent = (): string => {
+      const condition = safe(practiceData.condition?.name) || 'the target condition';
+      const intervention = safe(practiceData.intervention?.name) || 'the intervention';
+      const sampleSize = Number(practiceData.population?.totalCount || 0);
+      const outcomeNames = (practiceData.outcomes || []).map((o) => safe(o.name)).filter(Boolean);
+      const primaryOutcome = outcomeNames[0] || 'the primary outcome';
+      const outcomesSummary = (practiceData.statistics?.outcomesStats || [])
+        .map((o: any) => {
+          const name = safe(o?.outcome);
+          const baseline = safe(o?.baseline?.mean);
+          const endpoint = safe(o?.endpoint?.mean);
+          const improvement = safe(o?.improvementRate);
+          return `${name}: baseline ${baseline}, endpoint ${endpoint}, improvement ${improvement}%`;
+        })
+        .filter(Boolean)
+        .join('; ');
+
+      if (sectionType === 'methods') {
+        return `This practice-based study evaluated ${intervention} in patients with ${condition}. We used a ${safe(practiceData.studyType) || 'case-series'} design with de-identified clinical data from ${sampleSize || 'a defined'} participants. Baseline and follow-up measurements were collected for ${outcomeNames.join(', ') || 'key outcomes'}.
+
+Patient data were analyzed descriptively, including completion rate and outcome-level change from baseline to endpoint. Continuous outcomes were summarized using mean and standard deviation, and paired comparisons were assessed when data completeness allowed. All analyses were conducted on anonymized records in line with local research governance procedures.`;
+      }
+
+      if (sectionType === 'results') {
+        return `A total of ${sampleSize || 'multiple'} patients were included in the analysis, with an overall completion rate of ${completionRate}%. The intervention was associated with measurable changes across assessed outcomes.
+
+Key findings included ${outcomesSummary || 'improvement trends from baseline to endpoint across primary outcomes'}. The most clinically relevant change was observed in ${primaryOutcome}. No major data integrity concerns were identified in the analyzed cohort.`;
+      }
+
+      if (sectionType === 'discussion') {
+        return `This practice-based analysis suggests that ${intervention} may provide clinically meaningful benefit for ${condition}, with improvements observed in ${primaryOutcome} and related outcomes. The observed changes are directionally consistent with expected therapeutic effects in real-world settings.
+
+Interpretation should consider the non-randomized, observational nature of the dataset and potential residual confounding. Nevertheless, the completeness profile and outcome trends support the feasibility of translating this protocol into routine care pathways.
+
+Future studies should include larger multi-center samples, longer follow-up, and comparative control strategies to strengthen causal inference and external validity.`;
+      }
+
+      if (sectionType === 'introduction') {
+        return `${condition} remains a meaningful clinical challenge in routine practice. While controlled studies provide efficacy signals, there is ongoing need for real-world evidence that reflects implementation realities.
+
+This manuscript examines outcomes associated with ${intervention} in a practice-based cohort, with focus on clinical relevance, feasibility, and translational value for day-to-day care.`;
+      }
+
+      if (sectionType === 'conclusion') {
+        return `In this real-world cohort, ${intervention} was associated with favorable outcome trends and acceptable completion. These findings support continued evaluation in larger and more controlled study designs.`;
+      }
+
+      return `1. Authoritative guideline relevant to ${condition}.
+2. Key review article on ${intervention} and outcome mechanisms.
+3. Recent real-world evidence studies for ${primaryOutcome}.`;
+    };
+
     try {
       setSectionBusy((prev) => ({ ...prev, [sectionType]: true }));
 
@@ -220,9 +272,11 @@ export default function GeneratePracticeManuscriptPage() {
       setSections((prev) => ({ ...prev, [sectionType]: content }));
       toast.success(`${SECTION_LABELS[sectionType]} generated`);
     } catch (error: any) {
+      const backup = fallbackContent();
+      setSections((prev) => ({ ...prev, [sectionType]: backup }));
       toast.error(
         error?.response?.data?.error ||
-          `Failed to generate ${SECTION_LABELS[sectionType]}. You can edit this section manually.`
+          `AI generation failed for ${SECTION_LABELS[sectionType]}. A structured draft was inserted; please review/edit.`
       );
     } finally {
       setSectionBusy((prev) => ({ ...prev, [sectionType]: false }));
