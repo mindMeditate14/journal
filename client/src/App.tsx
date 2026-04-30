@@ -1,9 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './utils/authStore';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ManuscriptEditPage from './pages/ManuscriptEditPage';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -103,6 +104,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
                 <ManuscriptCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/manuscripts/:manuscriptId/edit"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
+                <ManuscriptEditPage />
               </ProtectedRoute>
             }
           />

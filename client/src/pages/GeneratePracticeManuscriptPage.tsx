@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import apiClient from '../api/client';
@@ -47,8 +47,18 @@ interface PracticeData {
     duration?: string;
     frequency?: string;
   };
-  population?: { totalCount?: number; ageRange?: { min?: number; max?: number }; demographics?: string };
-  outcomes?: Array<{ name?: string; type?: string; unit?: string; measurementMethod?: string; isPrimary?: boolean }>;
+  population?: {
+    totalCount?: number;
+    ageRange?: { min?: number; max?: number };
+    demographics?: string;
+  };
+  outcomes?: Array<{
+    name?: string;
+    type?: string;
+    unit?: string;
+    measurementMethod?: string;
+    isPrimary?: boolean;
+  }>;
   literatureContext?: { targetDiscipline?: string; targetMethodology?: string };
   manuscriptStatus?: string;
   statistics?: {
@@ -59,18 +69,18 @@ interface PracticeData {
   };
 }
 
-const safe = (value: unknown) => (value === undefined || value === null ? '' : String(value));
+const safe = (value: unknown) =>
+  value === undefined || value === null ? '' : String(value);
 
 export default function GeneratePracticeManuscriptPage() {
   const { practiceDataId } = useParams();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
 
-    const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [generatingAll, setGeneratingAll] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
-  const [exportingPdf, setExportingPdf] = useState(false);
-    const [autoGenerating, setAutoGenerating] = useState(false);
+  const [autoGenerating, setAutoGenerating] = useState(false);
   const [autoGenProgress, setAutoGenProgress] = useState('');
   const [oneClickLoading, setOneClickLoading] = useState(false);
   const [oneClickProgress, setOneClickProgress] = useState('');
@@ -106,7 +116,11 @@ export default function GeneratePracticeManuscriptPage() {
 
   const completionRate = useMemo(() => {
     if (!practiceData?.statistics) return 0;
-    return Number(practiceData.statistics.completionRate ?? practiceData.statistics.completeionRate ?? 0);
+    return Number(
+      practiceData.statistics.completionRate ??
+      practiceData.statistics.completeionRate ??
+      0
+    );
   }, [practiceData]);
 
   const keywords = useMemo(
@@ -118,7 +132,10 @@ export default function GeneratePracticeManuscriptPage() {
     [keywordsText]
   );
 
-  const openJournals = useMemo(() => journals.filter((j) => j.isOpen !== false), [journals]);
+  const openJournals = useMemo(
+    () => journals.filter((j) => j.isOpen !== false),
+    [journals]
+  );
 
   const buildContext = () => {
     const outcomesSummary = (practiceData?.statistics?.outcomesStats || [])
@@ -155,10 +172,20 @@ export default function GeneratePracticeManuscriptPage() {
     setTitle(`${safe(data.title)} - Manuscript Draft`);
     setAbstractText(defaultAbstractFromData(data));
     setDiscipline(safe(data.literatureContext?.targetDiscipline) || 'medicine');
-    setMethodology(safe(data.literatureContext?.targetMethodology) || safe(data.studyType) || 'case-series');
+    setMethodology(
+      safe(data.literatureContext?.targetMethodology) ||
+      safe(data.studyType) ||
+      'case-series'
+    );
 
-    const outcomeKeywords = (data.outcomes || []).map((o) => safe(o.name)).filter(Boolean);
-    const initialKeywords = [safe(data.condition?.name), safe(data.intervention?.name), ...outcomeKeywords]
+    const outcomeKeywords = (data.outcomes || [])
+      .map((o) => safe(o.name))
+      .filter(Boolean);
+    const initialKeywords = [
+      safe(data.condition?.name),
+      safe(data.intervention?.name),
+      ...outcomeKeywords,
+    ]
       .filter(Boolean)
       .slice(0, 8);
     setKeywordsText(initialKeywords.join(', '));
@@ -200,7 +227,9 @@ export default function GeneratePracticeManuscriptPage() {
       const condition = safe(practiceData.condition?.name) || 'the target condition';
       const intervention = safe(practiceData.intervention?.name) || 'the intervention';
       const sampleSize = Number(practiceData.population?.totalCount || 0);
-      const outcomeNames = (practiceData.outcomes || []).map((o) => safe(o.name)).filter(Boolean);
+      const outcomeNames = (practiceData.outcomes || [])
+        .map((o) => safe(o.name))
+        .filter(Boolean);
       const primaryOutcome = outcomeNames[0] || 'the primary outcome';
       const outcomesSummary = (practiceData.statistics?.outcomesStats || [])
         .map((o: any) => {
@@ -288,7 +317,7 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
     }
   };
 
-    const generateAllSections = async () => {
+  const generateAllSections = async () => {
     setGeneratingAll(true);
     try {
       for (const sectionType of SECTION_ORDER) {
@@ -299,10 +328,6 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
     }
   };
 
-  /**
-   * Auto-Generate: Use the complete-manuscript endpoint that generates
-   * all sections in parallel using statistics data automatically.
-   */
   const handleAutoGenerate = async () => {
     if (!practiceData) return;
 
@@ -325,7 +350,6 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
         return;
       }
 
-      // Parse the generated body into individual sections
       const newSections: Record<SectionKey, string> = {
         introduction: '',
         methods: '',
@@ -347,12 +371,10 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
 
       setSections(newSections);
 
-      // Update keywords if generated
       if (response.keywords && Array.isArray(response.keywords)) {
         setKeywordsText(response.keywords.join(', '));
       }
 
-      // Report any errors/warnings from the generation
       const errors = response.metadata?.errors || [];
       if (errors.length > 0) {
         const errorMsg = errors.map((e: any) => `${e.section}: ${e.warning}`).join('\n');
@@ -363,20 +385,16 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Auto-generation failed. Try generating sections individually.');
     } finally {
-            setAutoGenerating(false);
+      setAutoGenerating(false);
       setAutoGenProgress('');
     }
   };
 
-  /**
-   * ONE-CLICK: Validate → Generate Stats → Generate Manuscript → Save Draft
-   */
   const handleOneClickGenerate = async () => {
     if (!practiceData?._id) {
       toast.error('Practice data not loaded');
       return;
     }
-
     if (!journalId) {
       toast.error('Please select a target journal first');
       return;
@@ -387,10 +405,9 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
 
     try {
       setOneClickProgress('Step 1/3: Generating statistics...');
-
       setOneClickProgress('Step 2/3: Generating manuscript sections...');
-
       setOneClickProgress('Step 3/3: Saving draft manuscript...');
+
       const response = await manuscriptAPI.generateFromPracticeData({
         practiceDataId: practiceData._id,
         journalId,
@@ -408,12 +425,11 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
 
       const errors = response.generationMetadata?.errors || [];
       if (errors.length > 0) {
-        toast.success(`Draft created! ${errors.length} section(s) used fallback — please review those.`);
+        toast.success(`Draft created! ${errors.length} section(s) used fallback -- please review those.`);
       } else {
         toast.success('Manuscript draft created successfully!');
       }
 
-      // Navigate to draft review
       if (journalId) {
         navigate(`/journals/${journalId}/submit?draftId=${response.manuscript._id}`);
       }
@@ -425,9 +441,6 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
     }
   };
 
-  /**
-   * Export manuscript in various formats
-   */
   const handleExport = async (format: 'pdf' | 'docx' | 'html' | 'markdown') => {
     if (!practiceData) return;
 
@@ -459,7 +472,7 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
         toast.success('PDF export started');
       } else if (format === 'docx') {
         ManuscriptExporter.exportDOCX(exportData, `${baseName}.doc`);
-        toast.success('Word document exported — you can edit it in Microsoft Word');
+        toast.success('Word document exported -- you can edit it in Microsoft Word');
       } else if (format === 'html') {
         await ManuscriptExporter.exportHTML(exportData, `${baseName}.html`);
         toast.success('HTML exported');
@@ -473,9 +486,6 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
     }
   };
 
-  /**
-   * Look up relevant references from ingested papers
-   */
   const handleLookupReferences = async () => {
     if (!practiceData) return;
 
@@ -497,8 +507,8 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
       }
 
       const refsText = response.references.map((r: any) => `1. ${r.citation}`).join('\n');
-      setSections(prev => ({ ...prev, references: refsText }));
-      toast.success(`Found ${response.count} references — inserted into References section`);
+      setSections((prev) => ({ ...prev, references: refsText }));
+      toast.success(`Found ${response.count} references -- inserted into References section`);
     } catch {
       toast.error('Failed to look up references');
     }
@@ -560,46 +570,6 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
     }
   };
 
-  const exportPdf = async () => {
-    if (!practiceData) return;
-
-    try {
-      setExportingPdf(true);
-      await PDFGenerator.exportToPDF(
-        {
-          title,
-          condition: {
-            name: safe(practiceData.condition?.name),
-            description: safe(practiceData.condition?.description),
-          },
-          intervention: {
-            name: safe(practiceData.intervention?.name),
-            description: safe(practiceData.intervention?.description),
-          },
-          population: {
-            totalCount: Number(practiceData.population?.totalCount || 0),
-            ageRange: {
-              min: Number(practiceData.population?.ageRange?.min || 0),
-              max: Number(practiceData.population?.ageRange?.max || 0),
-            },
-          },
-          outcomes: practiceData.outcomes || [],
-          statistics: {
-            completionRate,
-            outcomesStats: practiceData.statistics?.outcomesStats || [],
-          },
-          studyType: safe(practiceData.studyType),
-        },
-        `${title.replace(/\s+/g, '_').toLowerCase() || 'practice_manuscript'}.pdf`
-      );
-      toast.success('PDF export started');
-    } catch {
-      toast.error('Failed to export PDF');
-    } finally {
-      setExportingPdf(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
@@ -619,6 +589,7 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
+        {/* Header */}
         <div className="bg-white rounded-lg shadow p-6 space-y-3">
           <h1 className="text-3xl font-bold text-gray-900">Generate Manuscript from Practice Data</h1>
           <p className="text-gray-600">
@@ -634,6 +605,7 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
           </div>
         </div>
 
+        {/* Metadata */}
         <div className="bg-white rounded-lg shadow p-6 space-y-4">
           <h2 className="text-xl font-semibold text-gray-900">Submission Metadata</h2>
           <div className="grid md:grid-cols-2 gap-4">
@@ -698,98 +670,101 @@ This manuscript examines outcomes associated with ${intervention} in a practice-
           </div>
         </div>
 
-                <div className="bg-white rounded-lg shadow p-6">
-                  <div className="flex flex-wrap gap-3 mb-4">
-                    {/* ONE-CLICK: Everything from data to draft */}
-                    <button
-                      type="button"
-                      onClick={handleOneClickGenerate}
-                      disabled={oneClickLoading || !journalId}
-                      className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-5 py-2.5 rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 font-bold shadow-sm"
-                      title={!journalId ? 'Select a target journal first to enable one-click generation' : 'Generate stats + manuscript + save draft in one click'}
-                    >
-                      {oneClickLoading
-                        ? `⚡ ${oneClickProgress || 'Working...'}`
-                        : '⚡ One-Click: Data → Manuscript → Draft'}
-                    </button>
+        {/* Generation Actions */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex flex-wrap gap-3 mb-4">
+            <button
+              type="button"
+              onClick={handleOneClickGenerate}
+              disabled={oneClickLoading || !journalId}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-5 py-2.5 rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 font-bold shadow-sm"
+              title={!journalId ? 'Select a target journal first to enable one-click generation' : 'Generate stats + manuscript + save draft in one click'}
+            >
+              {oneClickLoading
+                ? `⚡ ${oneClickProgress || 'Working...'}`
+                : '⚡ One-Click: Data -> Manuscript -> Draft'}
+            </button>
 
-                    <button
-                      type="button"
-                      onClick={handleAutoGenerate}
-                      disabled={autoGenerating}
-                      className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
-                    >
-                      {autoGenerating ? `🤖 ${autoGenProgress || 'Generating...'}` : '🤖 Auto-Generate (All Sections)'}
-                    </button>
+            <button
+              type="button"
+              onClick={handleAutoGenerate}
+              disabled={autoGenerating}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
+            >
+              {autoGenerating
+                ? `🤖 ${autoGenProgress || 'Generating...'}`
+                : '🤖 Auto-Generate (All Sections)'}
+            </button>
 
-                    <button
-                      type="button"
-                      onClick={generateAllSections}
-                      disabled={generatingAll}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                    >
-                      {generatingAll ? 'Generating All...' : 'Generate All (Sequential)'}
-                    </button>
-                  </div>
+            <button
+              type="button"
+              onClick={generateAllSections}
+              disabled={generatingAll}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {generatingAll ? 'Generating All...' : 'Generate All (Sequential)'}
+            </button>
+          </div>
 
-                  {/* Export Options */}
-                  <div className="flex flex-wrap gap-2 mb-4 border-t pt-3">
-                    <span className="text-sm font-semibold text-gray-600 mr-2 py-1">Export:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleExport('pdf')}
-                      className="text-sm bg-red-50 text-red-700 px-3 py-1.5 rounded hover:bg-red-100 border border-red-200"
-                      title="Export as PDF with embedded charts"
-                    >
-                      📄 PDF
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleExport('docx')}
-                      className="text-sm bg-blue-50 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-100 border border-blue-200"
-                      title="Export as Word document — can be edited in Microsoft Word"
-                    >
-                      📝 Word (DOC)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleExport('html')}
-                      className="text-sm bg-gray-50 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-100 border border-gray-200"
-                      title="Export as HTML file"
-                    >
-                      🌐 HTML
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleExport('markdown')}
-                      className="text-sm bg-green-50 text-green-700 px-3 py-1.5 rounded hover:bg-green-100 border border-green-200"
-                      title="Export as Markdown text file"
-                    >
-                      📋 Markdown
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleLookupReferences}
-                      className="text-sm bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded hover:bg-yellow-100 border border-yellow-200 ml-2"
-                      title="Look up references from your ingested papers database"
-                    >
-                      📚 Find References
-                    </button>
-                  </div>
+          {/* Export Options */}
+          <div className="flex flex-wrap gap-2 mb-4 border-t pt-3">
+            <span className="text-sm font-semibold text-gray-600 mr-2 py-1">Export:</span>
+            <button
+              type="button"
+              onClick={() => handleExport('pdf')}
+              className="text-sm bg-red-50 text-red-700 px-3 py-1.5 rounded hover:bg-red-100 border border-red-200"
+              title="Export as PDF with embedded charts"
+            >
+              📄 PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('docx')}
+              className="text-sm bg-blue-50 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-100 border border-blue-200"
+              title="Export as Word document -- can be edited in Microsoft Word"
+            >
+              📝 Word (DOC)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('html')}
+              className="text-sm bg-gray-50 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-100 border border-gray-200"
+              title="Export as HTML file"
+            >
+              🌐 HTML
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('markdown')}
+              className="text-sm bg-green-50 text-green-700 px-3 py-1.5 rounded hover:bg-green-100 border border-green-200"
+              title="Export as Markdown text file"
+            >
+              📋 Markdown
+            </button>
+            <button
+              type="button"
+              onClick={handleLookupReferences}
+              className="text-sm bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded hover:bg-yellow-100 border border-yellow-200 ml-2"
+              title="Look up references from your ingested papers database"
+            >
+              📚 Find References
+            </button>
+          </div>
 
-                  {/* Save Draft Button */}
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={saveAsDraft}
-                      disabled={savingDraft}
-                      className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-                    >
-                      {savingDraft ? 'Saving...' : '💾 Save Draft and Continue'}
-                    </button>
-                  </div>
+          {/* Save Draft */}
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={saveAsDraft}
+              disabled={savingDraft}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {savingDraft ? 'Saving...' : '💾 Save Draft and Continue'}
+            </button>
+          </div>
 
-          <div className="space-y-6">
+          {/* Individual Sections */}
+          <div className="space-y-6 mt-6">
             {SECTION_ORDER.map((key) => (
               <section key={key} className="border rounded-lg p-4 bg-gray-50">
                 <div className="flex items-center justify-between mb-3">

@@ -894,9 +894,9 @@ export async function listManuscripts(req, res, next) {
       filter.journalId = journalId;
     }
 
-    const manuscripts = await Manuscript.find(filter)
+        const manuscripts = await Manuscript.find(filter)
       .populate('journalId', 'title')
-      .sort({ submittedAt: -1 })
+      .sort({ updatedAt: -1 })
       .limit(parseInt(limit))
       .skip(skip);
 
