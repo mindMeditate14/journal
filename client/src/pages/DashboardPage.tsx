@@ -68,7 +68,7 @@ export default function DashboardPage() {
         const [draftResp, submittedResp, publishedResp] = await Promise.all([
           apiClient.get('/manuscripts', { params: { status: 'draft', page: 1, limit: 50 } }),
           apiClient.get('/manuscripts', {
-            params: { status: 'submitted,under-review,revision-requested,accepted', page: 1, limit: 50 } },
+            params: { status: 'submitted', page: 1, limit: 50 } },
           }),
           apiClient.get('/manuscripts', { params: { status: 'published', page: 1, limit: 50 } }),
         ]);

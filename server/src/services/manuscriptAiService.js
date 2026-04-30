@@ -422,7 +422,7 @@ export const generateCompleteManuscript = async ({ practiceData, statistics, opt
   const total = population?.totalCount || 0;
   const ageMin = population?.ageRange?.min || 18;
   const ageMax = population?.ageRange?.max || 65;
-  const completionRate = statistics?.completionRate ?? statistics?.completeionRate ?? 0;
+  const completionRate = statistics?.completionRate ?? 0;
 
   const outcomesSummary = (statistics?.outcomesStats || statistics?.outcomesAnalysis || []).map((o) => {
     const name = o?.outcome || o?.name || 'Outcome';

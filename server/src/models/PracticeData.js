@@ -105,8 +105,7 @@ const practiceDataSchema = new mongoose.Schema(
 
         // Statistical Summary (calculated by system)
     statistics: {
-      completeionRate: Number, // % of patients who completed (typo kept for backward compat)
-      completionRate: Number, // correct spelling
+      completionRate: Number, // % of patients who completed
       baselineStats: {}, // Summary stats for each outcome at baseline
       outcomesStats: [
         {
