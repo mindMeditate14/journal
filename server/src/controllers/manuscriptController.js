@@ -920,6 +920,27 @@ export async function listManuscripts(req, res, next) {
  * Get manuscript by ID
  * GET /api/manuscripts/:id
  */
+export async function deleteManuscript(req, res, next) {
+  try {
+    const manuscript = await Manuscript.findById(req.params.id);
+    if (!manuscript) {
+      return res.status(404).json({ error: 'Manuscript not found' });
+    }
+    const isAuthor = manuscript.submittedBy?.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === 'admin';
+    if (!isAuthor && !isAdmin) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+    if (manuscript.status !== 'draft') {
+      return res.status(400).json({ error: 'Only draft manuscripts can be deleted' });
+    }
+    await Manuscript.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Manuscript deleted' });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function viewManuscript(req, res, next) {
   try {
     const { id } = req.params;

@@ -44,9 +44,12 @@ export const manuscriptAPI = {
     });
     return data;
   },
-  getById: async (id: string): Promise<Manuscript> => {
+    getById: async (id: string): Promise<Manuscript> => {
     const { data } = await apiClient.get(`/manuscripts/${id}`);
     return data;
+  },
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/manuscripts/${id}`);
   },
   create: async (manuscript: Partial<Manuscript>) => {
     const { data } = await apiClient.post('/manuscripts', manuscript);

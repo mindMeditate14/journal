@@ -10,9 +10,10 @@ import {
   generateAiSection,
   generateAiStructuredDraft,
   getExtractionReport,
-  listReviewerCandidates,
+    listReviewerCandidates,
   lookupReferences,
   generateFromPracticeData,
+  deleteManuscript,
   submitExistingPaper,
   submitManuscript,
   listManuscripts,
@@ -73,6 +74,7 @@ router.post('/ai/generate-from-practice-data', authMiddleware, generateFromPract
 router.post('/', authMiddleware, submitManuscript);
 router.get('/', authMiddleware, listManuscripts);
 router.get('/:id', authMiddleware, viewManuscript);
+router.delete('/:id', authMiddleware, deleteManuscript);
 router.patch('/:id', authMiddleware, updateManuscript);
 router.get('/:id/extraction-report', authMiddleware, getExtractionReport);
 router.post('/:id/final-document', authMiddleware, uploadDocument.single('document'), uploadFinalDocument);

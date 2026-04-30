@@ -21,8 +21,12 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [submissions, setSubmissions] = useState<any[]>([]);
+    const [submissions, setSubmissions] = useState<any[]>([]);
   const [submissionsLoading, setSubmissionsLoading] = useState(true);
+  const [draftCount, setDraftCount] = useState(0);
+  const [publishedCount, setPublishedCount] = useState(0);
+  const [filterStatus, setFilterStatus] = useState<string>('all'); // all | draft | submitted | under-review | etc.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [uploadingDocFor, setUploadingDocFor] = useState<string | null>(null);
   const [uploadingWorkingDocFor, setUploadingWorkingDocFor] = useState<string | null>(null);
   const [selectedDocs, setSelectedDocs] = useState<Record<string, File | null>>({});
@@ -58,13 +62,26 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchSubmissions = async () => {
       try {
-        const response = await apiClient.get('/manuscripts', {
-          params: { page: 1, limit: 10 },
-        });
-        setSubmissions(response.data?.manuscripts || []);
+        const [draftResp, submittedResp, publishedResp] = await Promise.all([
+          apiClient.get('/manuscripts', { params: { status: 'draft', page: 1, limit: 50 } }),
+          apiClient.get('/manuscripts', {
+            params: { status: 'submitted,under-review,revision-requested,accepted', page: 1, limit: 50 } },
+          }),
+          apiClient.get('/manuscripts', { params: { status: 'published', page: 1, limit: 50 } }),
+        ]);
+
+        const drafts = draftResp.data?.manuscripts || [];
+        const submitted = submittedResp.data?.manuscripts || [];
+        const published = publishedResp.data?.manuscripts || [];
+
+        setDraftCount(drafts.length);
+        setPublishedCount(published.length);
+
+        // Combine all for display, prioritized: draft → submitted → published
+        setSubmissions([...drafts, ...submitted, ...published]);
       } catch (error) {
         // Keep dashboard usable even if submissions list fails.
       } finally {
@@ -128,7 +145,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleWorkingDocumentUpload = async (manuscriptId: string) => {
+    const handleWorkingDocumentUpload = async (manuscriptId: string) => {
     const file = selectedWorkingDocs[manuscriptId];
     if (!file) {
       toast.error('Select a Word/PDF file first');
@@ -148,6 +165,39 @@ export default function DashboardPage() {
       toast.error(error?.response?.data?.error || 'Failed to upload working document');
     } finally {
       setUploadingWorkingDocFor(null);
+    }
+  };
+
+  /** Edit a draft manuscript */
+  const handleEditDraft = (manuscriptId: string) => {
+    navigate(`/manuscripts/${manuscriptId}/edit`);
+  };
+
+  /** Navigate to manuscript generation from practice data */
+  const handleEditPracticeManuscript = (manuscriptId: string, practiceDataId?: string) => {
+    if (practiceDataId) {
+      navigate(`/practice-data/${practiceDataId}/generate-manuscript`);
+    } else {
+      navigate(`/manuscripts/${manuscriptId}/edit`);
+    }
+  };
+
+    /** Delete a draft manuscript */
+  const handleDeleteManuscript = async (manuscriptId: string, title: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${title || 'this manuscript'}"? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(manuscriptId);
+    try {
+      await manuscriptAPI.delete(manuscriptId);
+      toast.success('Manuscript deleted');
+      await refreshSubmissions();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to delete manuscript');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -358,7 +408,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900">Projects</h3>
             <p className="text-3xl font-bold text-indigo-600 mt-2">{projects.length}</p>
@@ -366,12 +416,22 @@ export default function DashboardPage() {
 
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900">Drafts</h3>
-            <p className="text-3xl font-bold text-indigo-600 mt-2">0</p>
+            <p className="text-3xl font-bold text-purple-600 mt-2">{draftCount}</p>
+            <p className="text-xs text-gray-500 mt-1">Manuscripts in progress</p>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900">Submitted</h3>
+            <p className="text-3xl font-bold text-amber-600 mt-2">
+              {submissions.filter((s) => ['submitted', 'under-review', 'revision-requested', 'accepted'].includes(s.status)).length}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Under review</p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900">Published</h3>
-            <p className="text-3xl font-bold text-indigo-600 mt-2">0</p>
+            <p className="text-3xl font-bold text-green-600 mt-2">{publishedCount}</p>
+            <p className="text-xs text-gray-500 mt-1">Successfully published</p>
           </div>
         </div>
 
@@ -423,55 +483,121 @@ export default function DashboardPage() {
           ) : submissions.length === 0 ? (
             <p className="p-6 text-gray-600">No papers submitted yet. Click "New Manuscript Draft" to start.</p>
           ) : (
-            <div className="divide-y">
+                        <div className="divide-y">
               {submissions.map((m: any) => (
                 <div key={m._id} className="p-6">
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{m.title}</h3>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-lg font-semibold text-gray-900">{m.title}</h3>
+                        <span className={`text-xs px-2 py-1 rounded capitalize font-medium ${m.status === 'draft' ? 'bg-purple-100 text-purple-800' : m.status === 'published' ? 'bg-green-100 text-green-800' : m.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+                          {String(m.status || 'draft').replace('-', ' ')}
+                        </span>
+                      </div>
+
+                      {m.status === 'draft' && (
+                        <p className="text-sm text-purple-700 mt-1">
+                          Draft not yet submitted — edit below to continue
+                        </p>
+                      )}
+
                       <p className="text-sm text-gray-600 mt-1">
-                        Journal: {m.journalId?.title || 'Unspecified'}
+                        {m.journalId?.title ? `Journal: ${m.journalId.title}` : m.status === 'draft' ? 'No journal selected yet' : 'Journal: Unspecified'}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        Submitted: {m.submittedAt ? new Date(m.submittedAt).toLocaleString() : 'N/A'}
-                      </p>
+
+                      {m.status !== 'draft' && m.submittedAt && (
+                        <p className="text-sm text-gray-600">
+                          Submitted: {new Date(m.submittedAt).toLocaleString()}
+                        </p>
+                      )}
+
+                      {m.status === 'draft' && m.createdAt && (
+                        <p className="text-sm text-gray-500">
+                          Created: {new Date(m.createdAt).toLocaleString()}
+                        </p>
+                      )}
+
                       {m.submissionId && (
                         <p className="text-sm text-gray-600">Submission ID: {m.submissionId}</p>
                       )}
+
                       {m.editorNotes && (
                         <p className="text-sm text-amber-700 mt-1">Editor note: {m.editorNotes}</p>
                       )}
+
                       {(m.workingDocument?.url || m.finalDocument?.url) && (
-                        <a
-                          href={m.workingDocument?.url || m.finalDocument?.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm text-indigo-700 underline mt-1 inline-block"
-                        >
-                          Open working document
-                        </a>
+                        <div className="flex gap-3 mt-2">
+                          {m.workingDocument?.url && (
+                            <a
+                              href={m.workingDocument.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-sm text-indigo-700 underline"
+                            >
+                              📄 Working document
+                            </a>
+                          )}
+                          {m.finalDocument?.url && (
+                            <a
+                              href={m.finalDocument.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-sm text-emerald-700 underline"
+                            >
+                              📑 Final PDF
+                            </a>
+                          )}
+                        </div>
                       )}
-                      {m.finalDocument?.url && (
-                        <a
-                          href={m.finalDocument.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm text-emerald-700 underline mt-1 ml-3 inline-block"
-                        >
-                          Open final PDF
-                        </a>
+
+                      {m.keywords?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {m.keywords.map((kw: string, i: number) => (
+                            <span key={i} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{kw}</span>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    <span className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded capitalize">
-                      {String(m.status || 'submitted').replace('-', ' ')}
-                    </span>
+
+                    {/* Actions Column */}
+                    <div className="flex flex-col gap-2 min-w-[120px]">
+                      {m.status === 'draft' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleEditDraft(m._id)}
+                            className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteManuscript(m._id, m.title)}
+                            disabled={deletingId === m._id}
+                            className="px-3 py-1.5 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100 disabled:opacity-50"
+                          >
+                            {deletingId === m._id ? 'Deleting...' : '🗑 Delete'}
+                          </button>
+                        </>
+                      )}
+                      {m.status === 'revision-requested' && (
+                        <button
+                          type="button"
+                          onClick={() => handleEditDraft(m._id)}
+                          className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700"
+                        >
+                          ✏️ Revise
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {(m.status === 'submitted' || m.status === 'under-review' || m.status === 'revision-requested' || m.status === 'accepted' || m.status === 'rejected') && (
+                  {/* Working document upload for submitted/under-review */}
+                  {(m.status === 'submitted' || m.status === 'under-review' || m.status === 'revision-requested' || m.status === 'accepted') && (
                     <div className="mt-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
                       <p className="text-sm text-gray-700 mb-2">
                         Upload editable Word/PDF working document so reviewer/editor can annotate and request corrections.
-                        {m.status === 'rejected' || m.status === 'revision-requested'
+                        {m.status === 'revision-requested'
                           ? ' Uploading here will resubmit this manuscript to the editor queue.'
                           : ''}
                       </p>
@@ -491,12 +617,12 @@ export default function DashboardPage() {
                           type="button"
                           onClick={() => handleWorkingDocumentUpload(m._id)}
                           disabled={uploadingWorkingDocFor === m._id}
-                          className="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50"
+                          className="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm"
                         >
                           {uploadingWorkingDocFor === m._id
                             ? 'Uploading...'
-                            : m.status === 'rejected' || m.status === 'revision-requested'
-                              ? 'Upload Revised Document & Resubmit'
+                            : m.status === 'revision-requested'
+                              ? 'Upload Revised & Resubmit'
                               : 'Upload Working Document'}
                         </button>
                       </div>
@@ -504,9 +630,9 @@ export default function DashboardPage() {
                   )}
 
                   {m.status === 'accepted' && (
-                    <div className="mt-4 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    <div className="mt-3 border border-gray-200 rounded-lg p-3 bg-gray-50">
                       <p className="text-sm text-gray-700 mb-2">
-                        After approval, upload final PDF for searchable publication.
+                        Upload final PDF for searchable publication.
                       </p>
                       <div className="flex flex-col md:flex-row md:items-center gap-2">
                         <input
@@ -524,7 +650,7 @@ export default function DashboardPage() {
                           type="button"
                           onClick={() => handleFinalDocumentUpload(m._id)}
                           disabled={uploadingDocFor === m._id}
-                          className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                          className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
                         >
                           {uploadingDocFor === m._id ? 'Uploading...' : 'Upload Final Document'}
                         </button>
