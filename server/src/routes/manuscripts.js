@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import {
   createDraft,
+  generateCompleteManuscript,
   createDraftFromPdf,
   extractMetadataFromPdf,
   generateAiClinicalDraft,
@@ -10,6 +11,8 @@ import {
   generateAiStructuredDraft,
   getExtractionReport,
   listReviewerCandidates,
+  lookupReferences,
+  generateFromPracticeData,
   submitExistingPaper,
   submitManuscript,
   listManuscripts,
@@ -57,7 +60,14 @@ router.post('/ai/outline', authMiddleware, generateAiOutline);
 router.post('/ai/section', authMiddleware, generateAiSection);
 router.post('/ai/structured-draft', authMiddleware, generateAiStructuredDraft);
 router.post('/ai/clinical-draft', authMiddleware, generateAiClinicalDraft);
+router.post('/ai/complete-manuscript', authMiddleware, generateCompleteManuscript);
 router.get('/reviewer-candidates', authMiddleware, requireRole(['editor', 'admin']), listReviewerCandidates);
+
+// Reference lookup from ingested papers
+router.get('/references/lookup', authMiddleware, lookupReferences);
+
+// One-click: validate → stats → manuscript → draft
+router.post('/ai/generate-from-practice-data', authMiddleware, generateFromPracticeData);
 
 // Author routes
 router.post('/', authMiddleware, submitManuscript);

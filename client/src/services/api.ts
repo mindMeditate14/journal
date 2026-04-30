@@ -129,7 +129,7 @@ export const manuscriptAPI = {
     const { data } = await apiClient.post('/manuscripts/ai/structured-draft', payload);
     return data;
   },
-  generateClinicalDraft: async (payload: {
+    generateClinicalDraft: async (payload: {
     title: string;
     abstract: string;
     discipline?: string;
@@ -140,6 +140,22 @@ export const manuscriptAPI = {
     notes?: string;
   }) => {
     const { data } = await apiClient.post('/manuscripts/ai/clinical-draft', payload);
+    return data;
+  },
+    generateCompleteManuscript: async (payload: {
+    practiceData: any;
+    statistics?: any;
+    options?: any;
+  }) => {
+    const { data } = await apiClient.post('/manuscripts/ai/complete-manuscript', payload);
+    return data;
+  },
+  lookupReferences: async (params: { condition?: string; intervention?: string; outcome?: string; limit?: number }) => {
+    const { data } = await apiClient.get('/manuscripts/references/lookup', { params });
+    return data;
+  },
+  generateFromPracticeData: async (payload: { practiceDataId: string; journalId?: string; options?: any }) => {
+    const { data } = await apiClient.post('/manuscripts/ai/generate-from-practice-data', payload);
     return data;
   },
 };

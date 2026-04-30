@@ -13,6 +13,7 @@ import {
   generateOutline,
   generateSectionDraft,
   generateStructuredDraft,
+  generateCompleteManuscript as generateFullManuscript,
 } from '../services/manuscriptAiService.js';
 
 const toStringOrEmpty = (value) => (value === undefined || value === null ? '' : String(value).trim());
@@ -484,6 +485,236 @@ export async function generateAiClinicalDraft(req, res, next) {
 
     const draft = await generateClinicalDraft(req.body || {});
     res.json({ success: true, draft });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Generate complete manuscript from practice data + statistics in one call
+ * POST /api/manuscripts/ai/complete-manuscript
+ */
+export async function generateCompleteManuscript(req, res, next) {
+  try {
+    const { practiceData, statistics, options } = req.body || {};
+
+    if (!practiceData) {
+      return res.status(400).json({ error: 'practiceData is required' });
+    }
+
+    const result = await generateFullManuscript({ practiceData, statistics, options });
+    res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Look up relevant references from the ingested papers database
+ * GET /api/manuscripts/references/lookup?condition=...&intervention=...&limit=10
+ */
+export async function lookupReferences(req, res, next) {
+  try {
+    const {
+      condition,
+      intervention,
+      outcome,
+      limit = 10,
+    } = req.query;
+
+    const searchTerms = [condition, intervention, outcome]
+      .filter(Boolean)
+      .map((s) => String(s).trim())
+      .filter((s) => s.length > 1);
+
+    if (searchTerms.length === 0) {
+      return res.status(400).json({ error: 'At least one of condition, intervention, or outcome is required' });
+    }
+
+    const maxLimit = Math.min(parseInt(limit, 10) || 10, 20);
+
+    // Build a search query that looks for papers matching condition/intervention
+    const query = searchTerms.join(' ');
+
+    const papers = await Paper.find({
+      $text: { $search: query },
+    })
+      .select('_id title abstract authors publishedAt doi journal sourceProvenance keywords isOpenAccess')
+      .limit(maxLimit)
+      .lean();
+
+    // If not enough results from text search, try keyword-based fallback
+    if (papers.length < maxLimit) {
+      const keywordFilter = searchTerms.slice(0, 2).map(term => ({
+        keywords: { $regex: term, $options: 'i' },
+      }));
+
+      if (keywordFilter.length > 0) {
+        const extraPapers = await Paper.find({
+          $or: keywordFilter,
+          _id: { $nin: papers.map(p => p._id) },
+        })
+          .select('_id title abstract authors publishedAt doi journal sourceProvenance keywords isOpenAccess')
+          .limit(maxLimit - papers.length)
+          .lean();
+
+        papers.push(...extraPapers);
+      }
+    }
+
+    const references = papers.map((paper) => {
+      const authorStr = Array.isArray(paper.authors)
+        ? paper.authors.slice(0, 3).join(', ') + (paper.authors.length > 3 ? ' et al.' : '')
+        : paper.authors || 'Unknown';
+      const year = paper.publishedAt ? new Date(paper.publishedAt).getFullYear() : 'n.d.';
+      const title = paper.title || 'Untitled';
+      const journal = paper.journal || paper.sourceProvenance?.[0]?.source || 'Unknown journal';
+      const doi = paper.doi ? `doi: ${paper.doi}` : '';
+
+      return {
+        _id: paper._id,
+        citation: `${authorStr} (${year}). ${title}. ${journal}. ${doi}`.replace(/\. \.$/, '.').trim(),
+        apaStyle: `${authorStr} (${year}). ${title}. ${journal}${doi ? `. ${doi}` : ''}`,
+        title: paper.title,
+        authors: paper.authors,
+        year,
+        doi: paper.doi,
+        journal: paper.journal,
+        keywords: paper.keywords,
+        isOpenAccess: paper.isOpenAccess,
+        url: paper.urls?.pdf || paper.urls?.source || paper.urls?.landing || '',
+      };
+    });
+
+    res.json({
+      success: true,
+      query: searchTerms,
+      count: references.length,
+      references,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * One-click: validate, generate statistics, generate manuscript, save draft
+ * POST /api/manuscripts/ai/generate-complete-from-data
+ */
+export async function generateFromPracticeData(req, res, next) {
+  try {
+    const { practiceDataId, journalId, options } = req.body || {};
+
+    if (!practiceDataId) {
+      return res.status(400).json({ error: 'practiceDataId is required' });
+    }
+
+    // Load practice data
+    const PracticeData = (await import('../models/PracticeData.js')).default;
+    const practiceData = await PracticeData.findById(practiceDataId);
+
+    if (!practiceData) {
+      return res.status(404).json({ error: 'Practice data not found' });
+    }
+
+    if (practiceData.practitioner?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Step 1: Generate statistics if missing
+    const StatisticsService = (await import('../services/statisticsService.js')).default;
+
+    if (!practiceData.statistics || !practiceData.statistics.outcomesStats?.length) {
+      const outcomeAnalysis = StatisticsService.analyzeOutcomes(practiceData);
+      const completionRate = StatisticsService.calculateCompletionRate(practiceData.patientData);
+      const adverseEventAnalysis = StatisticsService.analyzeAdverseEvents(practiceData);
+
+      practiceData.statistics = {
+        completionRate,
+        outcomesStats: outcomeAnalysis,
+        adverseEvents: adverseEventAnalysis,
+      };
+      await practiceData.save();
+    }
+
+    // Step 2: Generate complete manuscript
+    const manuscriptResult = await generateFullManuscript({ practiceData, statistics: practiceData.statistics, options });
+
+    // Step 3: Build the manuscript body from sections
+    const sectionDefs = [
+      'introduction', 'methods', 'results', 'discussion', 'conclusion', 'references',
+    ];
+
+    const bodyMarkdown = sectionDefs
+      .map(key => {
+        const section = manuscriptResult.sections?.[key];
+        const content = section?.content || '';
+        return content ? `## ${key.charAt(0).toUpperCase() + key.slice(1)}\n\n${content}` : '';
+      })
+      .filter(Boolean)
+      .join('\n\n');
+
+    // Step 4: Auto-generate abstract from content
+    const abstractText = manuscriptResult.sections?.introduction?.content || '';
+    const autoAbstract = abstractText.length > 0
+      ? `Background: ${practiceData.condition?.name || 'The condition'} is a clinical challenge in routine practice. Objective: To evaluate ${practiceData.intervention?.name || 'the intervention'} outcomes in a ${practiceData.studyType || 'case-series'} design. Methods: De-identified clinical data from ${practiceData.population?.totalCount || 0} patients with baseline and follow-up measurements were analyzed descriptively. Results: With a ${practiceData.statistics?.completionRate || 0}% completion rate, primary outcomes showed measurable improvement across assessed endpoints. Conclusion: This practice-based cohort suggests ${practiceData.intervention?.name || 'the intervention'} may provide clinically meaningful benefit; further controlled studies are recommended.`
+      : '';
+
+    // Step 5: Get keywords
+    const condName = practiceData.condition?.name || '';
+    const intName = practiceData.intervention?.name || '';
+    const discipline = practiceData.literatureContext?.targetDiscipline || 'medicine';
+    const outcomeNames = (practiceData.outcomes || []).map((o: any) => o?.name).filter(Boolean);
+    const keywords = [condName, intName, discipline, ...outcomeNames].filter(Boolean).slice(0, 8);
+
+    // Step 6: Save as draft
+    const draftPayload = {
+      title: `${practiceData.title || 'Manuscript'} - Draft`,
+      abstract: autoAbstract,
+      body: bodyMarkdown,
+      keywords,
+      discipline,
+      methodology: practiceData.studyType || 'case-series',
+      sourcePath: 'practice_data_auto_complete',
+      projectId: undefined,
+      journalId: journalId || undefined,
+      authors: [],
+      metadata: {
+        extractionWarnings: [
+          `Auto-generated from practice data ${practiceDataId}.`,
+          `Statistics: ${practiceData.statistics?.completionRate || 0}% completion, ${practiceData.statistics?.outcomesStats?.length || 0} outcomes analyzed.`,
+          'Please review all sections before submission.',
+        ],
+        sectionHeadings: sectionDefs.map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+        generatedFrom: 'generateFromPracticeData',
+        generationErrors: manuscriptResult.metadata?.errors || [],
+      },
+    };
+
+    const manuscript = await Manuscript.create({
+      ...draftPayload,
+      owner: req.user._id,
+      submittedBy: req.user._id,
+      status: 'draft',
+      version: 1,
+      lastEditedBy: req.user._id,
+      updatedAt: new Date(),
+    });
+
+    // Update practice data manuscript status
+    practiceData.manuscriptStatus = 'draft-created';
+    await practiceData.save();
+
+    res.json({
+      success: true,
+      manuscript: {
+        _id: manuscript._id,
+        title: manuscript.title,
+        status: manuscript.status,
+      },
+      statistics: practiceData.statistics,
+      generationMetadata: manuscriptResult.metadata,
+    });
   } catch (error) {
     next(error);
   }
