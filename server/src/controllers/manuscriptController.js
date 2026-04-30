@@ -664,7 +664,7 @@ export async function generateFromPracticeData(req, res, next) {
     const condName = practiceData.condition?.name || '';
     const intName = practiceData.intervention?.name || '';
     const discipline = practiceData.literatureContext?.targetDiscipline || 'medicine';
-    const outcomeNames = (practiceData.outcomes || []).map((o: any) => o?.name).filter(Boolean);
+    const outcomeNames = (practiceData.outcomes || []).map(o => o?.name).filter(Boolean);
     const keywords = [condName, intName, discipline, ...outcomeNames].filter(Boolean).slice(0, 8);
 
     // Step 6: Save as draft
