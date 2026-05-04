@@ -24,6 +24,8 @@ import GeneratePracticeManuscriptPage from './pages/GeneratePracticeManuscriptPa
 import { SubmitManuscriptPage } from './pages/SubmitManuscriptPage';
 import { EditorDashboardPage } from './pages/EditorDashboardPage';
 import { PeerReviewPage } from './pages/PeerReviewPage';
+import PublishedPapersPage from './pages/PublishedPapersPage';
+import PaperViewPage from './pages/PaperViewPage';
 
 export default function App() {
   const restoreSession = useAuthStore((state) => state.restoreSession);
@@ -40,6 +42,10 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+
+        {/* Public Pages */}
+        <Route path="/papers" element={<PublishedPapersPage />} />
+        <Route path="/papers/:id" element={<PaperViewPage />} />
 
         <Route element={<Layout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -45,12 +45,18 @@ export default function Layout() {
               Dashboard
             </button>
             <button
-              onClick={() => navigate('/search')}
-              className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
-            >
-              <Search size={20} />
-              Search
-            </button>
+                          onClick={() => navigate('/search')}
+                          className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
+                        >
+                          <Search size={20} />
+                          Search
+                        </button>
+                        <button
+                          onClick={() => navigate('/papers')}
+                          className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
+                        >
+                          📚 Published
+                        </button>
             <button
               onClick={() => navigate('/manuscripts/create')}
               className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
@@ -128,11 +134,17 @@ export default function Layout() {
               Dashboard
             </button>
             <button
-              onClick={() => navigate('/search')}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100"
-            >
-              Search
-            </button>
+                          onClick={() => navigate('/search')}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                        >
+                          Search
+                        </button>
+                        <button
+                          onClick={() => navigate('/papers')}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                        >
+                          Published Papers
+                        </button>
             <button
               onClick={() => navigate('/manuscripts/create')}
               className="w-full text-left px-4 py-2 hover:bg-gray-100"

@@ -217,7 +217,7 @@ export function EditorDashboardPage() {
                 <h2 className="text-lg font-semibold">Submissions ({submissions.length})</h2>
               </div>
 
-              <div className="divide-y max-h-96 overflow-y-auto">
+              <div className="divide-y max-h-[600px] overflow-y-auto">
                 {submissions.length === 0 ? (
                   <p className="p-4 text-gray-500 text-center">No submissions</p>
                 ) : (
@@ -230,11 +230,25 @@ export function EditorDashboardPage() {
                       }`}
                     >
                       <p className="font-medium text-gray-900 line-clamp-2">{m.title}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {m.status === 'submitted' && '📝 Submitted'}
-                        {m.status === 'under-review' && '👥 Under Review'}
-                        {m.status === 'revision-requested' && '✏️ Revisions Needed'}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                                              <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                                                m.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
+                                                m.status === 'under-review' ? 'bg-purple-100 text-purple-700' :
+                                                m.status === 'revision-requested' ? 'bg-amber-100 text-amber-700' :
+                                                m.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                                m.status === 'published' ? 'bg-emerald-100 text-emerald-700' :
+                                                'bg-gray-100 text-gray-700'
+                                              }`}>
+                                                {m.status}
+                                              </span>
+                                              <span className="text-xs text-gray-400">📄</span>
+                                            </div>
+                                            {m.authors?.[0]?.name && (
+                                                                    <p className="text-xs text-gray-500 mt-1">By: {m.authors[0].name}</p>
+                                                                  )}
+                                                                  {m.discipline && (
+                                                                    <p className="text-xs text-gray-400 mt-0.5">{m.discipline} • {m.methodology}</p>
+                                                                  )}
                     </button>
                   ))
                 )}
@@ -298,10 +312,20 @@ export function EditorDashboardPage() {
                   )}
 
                   <div>
-                    <p className="text-sm text-gray-600">Manuscript Preview</p>
-                    <div className="bg-gray-50 p-4 rounded max-h-60 overflow-y-auto text-sm text-gray-700">
-                      {selectedManuscript.body.substring(0, 500)}...
-                    </div>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                        <div className="bg-gray-100 px-4 py-2 flex justify-between items-center">
+                                          <p className="text-sm font-medium text-gray-700">Full Manuscript Content</p>
+                                          <button
+                                            onClick={() => window.open(`/manuscripts/${selectedManuscript._id}/edit`, '_blank')}
+                                            className="text-xs bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700"
+                                          >
+                                            📝 Edit in New Tab
+                                          </button>
+                                        </div>
+                                        <div className="bg-white p-4 max-h-[500px] overflow-y-auto text-sm text-gray-800 whitespace-pre-wrap">
+                                          {selectedManuscript.body || 'No content available'}
+                                        </div>
+                                      </div>
                   </div>
                 </div>
               </div>
