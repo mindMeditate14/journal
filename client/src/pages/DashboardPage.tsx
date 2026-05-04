@@ -63,36 +63,35 @@ export default function DashboardPage() {
   }, [user]);
 
     useEffect(() => {
-    const fetchSubmissions = async () => {
-      try {
-        const [draftResp, submittedResp, publishedResp] = await Promise.all([
-          apiClient.get('/manuscripts', { params: { status: 'draft', page: 1, limit: 50 } }),
-          apiClient.get('/manuscripts', {
-            params: { status: 'submitted', page: 1, limit: 50 },
-          }),
-          apiClient.get('/manuscripts', { params: { status: 'published', page: 1, limit: 50 } }),
-        ]);
+        const fetchSubmissions = async () => {
+          try {
+            // Fetch ALL manuscripts in one call
+            const response = await apiClient.get('/manuscripts', {
+              params: { page: 1, limit: 100 },
+            });
+        
+            const allManuscripts = response.data?.manuscripts || [];
+        
+            // Calculate counts
+            const drafts = allManuscripts.filter((m: any) => m.status === 'draft');
+            const published = allManuscripts.filter((m: any) => m.status === 'published');
+        
+            setDraftCount(drafts.length);
+            setPublishedCount(published.length);
 
-        const drafts = draftResp.data?.manuscripts || [];
-        const submitted = submittedResp.data?.manuscripts || [];
-        const published = publishedResp.data?.manuscripts || [];
+            // Combine all for display, prioritized: draft → submitted → published
+            setSubmissions(allManuscripts);
+          } catch (error) {
+            // Keep dashboard usable even if submissions list fails.
+          } finally {
+            setSubmissionsLoading(false);
+          }
+        };
 
-        setDraftCount(drafts.length);
-        setPublishedCount(published.length);
-
-        // Combine all for display, prioritized: draft → submitted → published
-        setSubmissions([...drafts, ...submitted, ...published]);
-      } catch (error) {
-        // Keep dashboard usable even if submissions list fails.
-      } finally {
-        setSubmissionsLoading(false);
-      }
-    };
-
-    if (user) {
-      fetchSubmissions();
-    }
-  }, [user]);
+        if (user) {
+          fetchSubmissions();
+        }
+      }, [user]);
 
   useEffect(() => {
     const loadJournals = async () => {
@@ -457,36 +456,42 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Actions Column */}
-                    <div className="flex flex-col gap-2 min-w-[120px]">
-                      {m.status === 'draft' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleEditDraft(m._id)}
-                            className="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteManuscript(m._id, m.title)}
-                            disabled={deletingId === m._id}
-                            className="px-3 py-1.5 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100 disabled:opacity-50"
-                          >
-                            {deletingId === m._id ? 'Deleting...' : '🗑 Delete'}
-                          </button>
-                        </>
-                      )}
-                      {m.status === 'revision-requested' && (
-                        <button
-                          type="button"
-                          onClick={() => handleEditDraft(m._id)}
-                          className="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700"
-                        >
-                          ✏️ Revise
-                        </button>
-                      )}
-                    </div>
+                                        <div className="flex flex-col gap-2 min-w-[120px]">
+                                          {(m.status === 'draft' || m.status === 'revision-requested') && (
+                                            <button
+                                              type="button"
+                                              onClick={() => navigate(`/manuscripts/${m._id}/revision`)}
+                                              className={`px-3 py-1.5 text-white text-sm rounded-lg hover:opacity-90 ${m.status === 'revision-requested' ? 'bg-amber-600' : 'bg-indigo-600'}`}
+                                            >
+                                              {m.status === 'revision-requested' ? '✏️ Revise' : '✏️ Edit'}
+                                            </button>
+                                          )}
+                                          {m.status === 'submitted' && (
+                                            <span className="px-3 py-1.5 bg-blue-100 text-blue-600 text-sm rounded-lg text-center">
+                                              Awaiting Review
+                                            </span>
+                                          )}
+                                          {m.status === 'under-review' && (
+                                            <span className="px-3 py-1.5 bg-amber-100 text-amber-600 text-sm rounded-lg text-center">
+                                              Under Review
+                                            </span>
+                                          )}
+                                          {m.status === 'accepted' && (
+                                            <span className="px-3 py-1.5 bg-green-100 text-green-600 text-sm rounded-lg text-center">
+                                              Approved
+                                            </span>
+                                          )}
+                                          {(m.status === 'draft' || m.status === 'revision-requested' || m.status === 'submitted' || m.status === 'under-review') && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDeleteManuscript(m._id, m.title)}
+                                              disabled={deletingId === m._id}
+                                              className="px-3 py-1.5 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100 disabled:opacity-50"
+                                            >
+                                              {deletingId === m._id ? 'Deleting...' : '🗑 Delete'}
+                                            </button>
+                                          )}
+                                        </div>
                   </div>
 
                   {/* Working document upload for submitted/under-review */}

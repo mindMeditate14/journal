@@ -58,20 +58,13 @@ export default function Layout() {
                           📚 Published
                         </button>
             <button
-              onClick={() => navigate('/manuscripts/create')}
-              className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
-            >
-              <Plus size={20} />
-              Create
-            </button>
-            <button
-              onClick={() => navigate('/practice-data/create')}
-              className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
-            >
-              <Plus size={20} />
-              Practice Data
-            </button>
-            {isEditor && (
+                          onClick={() => navigate('/manuscripts/create')}
+                          className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
+                        >
+                          <Plus size={20} />
+                          Create Manuscript
+                        </button>
+                        {isEditor && (
               <button
                 onClick={() => navigate('/editor/dashboard')}
                 className="flex items-center gap-2 text-gray-700 hover:text-indigo-600"
@@ -146,18 +139,12 @@ export default function Layout() {
                           Published Papers
                         </button>
             <button
-              onClick={() => navigate('/manuscripts/create')}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100"
-            >
-              Create Manuscript
-            </button>
-            <button
-              onClick={() => navigate('/practice-data/create')}
-              className="w-full text-left px-4 py-2 hover:bg-gray-100"
-            >
-              Practice Data
-            </button>
-            {isEditor && (
+                          onClick={() => navigate('/manuscripts/create')}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                        >
+                          Create Manuscript
+                        </button>
+                        {isEditor && (
               <button
                 onClick={() => navigate('/editor/dashboard')}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"

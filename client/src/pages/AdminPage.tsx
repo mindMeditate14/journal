@@ -5,7 +5,7 @@ import { AdminUser, AdminStats, Role } from '../types';
 import { useAuthStore } from '../utils/authStore';
 import toast from 'react-hot-toast';
 
-const ROLES: Role[] = ['admin', 'editor', 'researcher', 'practitioner', 'reader'];
+const ROLES: Role[] = ['admin', 'editor', 'researcher'];
 
 const getUserRoles = (user: AdminUser) => {
   if (Array.isArray(user.roles) && user.roles.length > 0) {
@@ -18,8 +18,6 @@ const ROLE_COLORS: Record<AdminUser['role'], string> = {
   admin: 'bg-amber-100 text-amber-800',
   editor: 'bg-violet-100 text-violet-800',
   researcher: 'bg-indigo-100 text-indigo-800',
-  practitioner: 'bg-emerald-100 text-emerald-800',
-  reader: 'bg-gray-100 text-gray-700',
 };
 
 export default function AdminPage() {

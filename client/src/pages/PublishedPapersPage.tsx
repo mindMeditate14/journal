@@ -61,7 +61,26 @@ export default function PublishedPapersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Public Header */}
+      <header className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-indigo-600">NexusJournal</h1>
+            <p className="text-sm text-gray-500">Published Research</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-gray-600 text-sm">Published Papers</span>
+            <Link 
+              to="/login" 
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            >
+              Login
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
       <div className="bg-indigo-700 text-white py-12">
         <div className="max-w-6xl mx-auto px-4">
           <h1 className="text-4xl font-bold mb-4">Published Research</h1>

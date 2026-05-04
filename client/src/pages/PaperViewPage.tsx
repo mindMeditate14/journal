@@ -120,20 +120,10 @@ export default function PaperViewPage() {
           <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{paper.abstract}</p>
         </div>
 
-        {/* Full Paper Content */}
-        {paper.body && (
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Full Paper</h2>
-            <div className="prose max-w-none text-gray-700 whitespace-pre-wrap">
-              {paper.body}
-            </div>
-          </div>
-        )}
-
         {/* Download Document */}
         {paper.finalDocument?.url && (
           <div className="bg-indigo-50 rounded-lg shadow p-6 mt-6 text-center">
-            <p className="text-indigo-700 mb-4">📄 Download full paper document</p>
+            <p className="text-indigo-700 mb-4 font-medium">📄 Download full paper to read complete content</p>
             <a 
               href={paper.finalDocument.url} 
               target="_blank" 

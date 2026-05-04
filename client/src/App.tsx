@@ -1,10 +1,11 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './utils/authStore';
-import Layout from './components/Layout';
+import SidebarLayout from './components/SidebarLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import ManuscriptEditPage from './pages/ManuscriptEditPage';
+import ManuscriptRevisionPage from './pages/ManuscriptRevisionPage';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -19,8 +20,6 @@ import AdminPage from './pages/AdminPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import JournalsPage from './pages/JournalsPage';
 import ManuscriptCreatePage from './pages/ManuscriptCreatePage';
-import PracticeDataCollectionPage from './pages/PracticeDataCollectionPage';
-import GeneratePracticeManuscriptPage from './pages/GeneratePracticeManuscriptPage';
 import { SubmitManuscriptPage } from './pages/SubmitManuscriptPage';
 import { EditorDashboardPage } from './pages/EditorDashboardPage';
 import { PeerReviewPage } from './pages/PeerReviewPage';
@@ -38,17 +37,19 @@ export default function App() {
     <BrowserRouter>
       <Toaster position="top-right" />
       <Routes>
+        {/* Public Routes - No Auth Required */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
-        {/* Public Pages */}
+        {/* Public Published Papers - Landing Page */}
+        <Route path="/" element={<PublishedPapersPage />} />
         <Route path="/papers" element={<PublishedPapersPage />} />
         <Route path="/papers/:id" element={<PaperViewPage />} />
 
-        <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {/* Protected Routes with Sidebar */}
+        <Route element={<SidebarLayout />}>
           <Route
             path="/dashboard"
             element={
@@ -66,7 +67,7 @@ export default function App() {
             }
           />
           <Route
-            path="/papers/:id"
+            path="/papers/manage/:id"
             element={
               <ProtectedRoute>
                 <PaperDetailPage />
@@ -122,18 +123,10 @@ export default function App() {
             }
           />
           <Route
-            path="/practice-data/create"
+            path="/manuscripts/:manuscriptId/revision"
             element={
               <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
-                <PracticeDataCollectionPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/practice-data/:practiceDataId/generate-manuscript"
-            element={
-              <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
-                <GeneratePracticeManuscriptPage />
+                <ManuscriptRevisionPage />
               </ProtectedRoute>
             }
           />
@@ -162,7 +155,9 @@ export default function App() {
             }
           />
         </Route>
-        <Route path="*" element={<Navigate to="/login" replace />} />
+
+        {/* Fallback to published papers */}
+        <Route path="*" element={<Navigate to="/papers" replace />} />
       </Routes>
     </BrowserRouter>
   );
