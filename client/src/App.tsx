@@ -24,6 +24,7 @@ import { SubmitManuscriptPage } from './pages/SubmitManuscriptPage';
 import { EditorDashboardPage } from './pages/EditorDashboardPage';
 import { PeerReviewPage } from './pages/PeerReviewPage';
 import PublishedPapersPage from './pages/PublishedPapersPage';
+import PublishedPapersWrapper from './components/PublishedPapersWrapper';
 import PaperViewPage from './pages/PaperViewPage';
 
 export default function App() {
@@ -43,9 +44,9 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
-        {/* Public Published Papers - Landing Page */}
-        <Route path="/" element={<PublishedPapersPage />} />
-        <Route path="/papers" element={<PublishedPapersPage />} />
+        {/* Published Papers - Landing Page (shows sidebar if logged in) */}
+        <Route path="/" element={<PublishedPapersWrapper />} />
+        <Route path="/papers" element={<PublishedPapersWrapper />} />
         <Route path="/papers/:id" element={<PaperViewPage />} />
 
         {/* Protected Routes with Sidebar */}
