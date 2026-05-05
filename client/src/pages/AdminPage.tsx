@@ -5,7 +5,7 @@ import { AdminUser, AdminStats, Role } from '../types';
 import { useAuthStore } from '../utils/authStore';
 import toast from 'react-hot-toast';
 
-const ROLES: Role[] = ['admin', 'editor', 'researcher'];
+const ROLES: Role[] = ['admin', 'editor', 'researcher', 'reviewer'];
 
 const getUserRoles = (user: AdminUser) => {
   if (Array.isArray(user.roles) && user.roles.length > 0) {
@@ -14,10 +14,11 @@ const getUserRoles = (user: AdminUser) => {
   return user.role ? [user.role] : [];
 };
 
-const ROLE_COLORS: Record<AdminUser['role'], string> = {
+const ROLE_COLORS: Record<string, string> = {
   admin: 'bg-amber-100 text-amber-800',
   editor: 'bg-violet-100 text-violet-800',
   researcher: 'bg-indigo-100 text-indigo-800',
+  reviewer: 'bg-teal-100 text-teal-800',
 };
 
 export default function AdminPage() {
@@ -90,6 +91,8 @@ export default function AdminPage() {
     try {
       const updated = await adminAPI.changeRole(user._id, selectedRoles);
       setUsers((prev) => prev.map((u) => (u._id === updated._id ? { ...u, role: updated.role, roles: updated.roles } : u)));
+      setPendingRoles((prev) => { const next = { ...prev }; delete next[user._id]; return next; });
+      setEditingRoles(null);
       toast.success(`${user.email} roles updated`);
       loadStats();
     } catch (err: any) {
@@ -103,6 +106,18 @@ export default function AdminPage() {
     const current = pendingRoles[user._id] || getUserRoles(user);
     const next = checked ? [...new Set([...current, role])] : current.filter((r) => r !== role);
     setPendingRoles((prev) => ({ ...prev, [user._id]: next }));
+  };
+
+  const [editingRoles, setEditingRoles] = useState<string | null>(null); // userId being edited
+
+  const startEditRoles = (user: AdminUser) => {
+    setPendingRoles((prev) => ({ ...prev, [user._id]: getUserRoles(user) }));
+    setEditingRoles(user._id);
+  };
+
+  const cancelEditRoles = (userId: string) => {
+    setPendingRoles((prev) => { const next = { ...prev }; delete next[userId]; return next; });
+    setEditingRoles(null);
   };
 
   const handleToggleActive = async (user: AdminUser) => {
@@ -201,7 +216,6 @@ export default function AdminPage() {
             <span className="text-sm font-medium text-gray-800">
               {loadingUsers ? 'Loading…' : `${total} user${total === 1 ? '' : 's'}`}
             </span>
-            <span className="text-xs text-gray-500">Tip: tick roles and click Save</span>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -221,7 +235,7 @@ export default function AdminPage() {
                   const isUpdatingRole = updating === u._id + ':role';
                   const isUpdatingActive = updating === u._id + ':active';
                   return (
-                    <tr key={u._id} className="border-t border-gray-100 hover:bg-gray-50">
+                    <tr key={u._id} className="border-t border-gray-100 hover:bg-gray-50 align-top">
                       <td className="px-4 py-3 font-medium text-gray-900">
                         {u.email}
                         {isSelf && (
@@ -229,35 +243,72 @@ export default function AdminPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2">
-                          {ROLES.map((role) => {
-                            const selected = (pendingRoles[u._id] || getUserRoles(u)).includes(role);
-                            return (
-                              <label
-                                key={role}
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs border ${selected ? ROLE_COLORS[role] : 'bg-white text-gray-600 border-gray-300'}`}
+                        {editingRoles === u._id ? (
+                          /* ── Edit mode ── */
+                          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2 min-w-[200px]">
+                            <p className="text-xs font-semibold text-indigo-700 mb-2">Assign roles:</p>
+                            {ROLES.map((role) => {
+                              const checked = (pendingRoles[u._id] ?? []).includes(role);
+                              return (
+                                <label key={role} className="flex items-center gap-2 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    className="w-4 h-4 accent-indigo-600"
+                                    checked={checked}
+                                    onChange={(e) => togglePendingRole(u, role, e.target.checked)}
+                                  />
+                                  <span className={`text-sm font-medium capitalize ${checked ? 'text-indigo-700' : 'text-gray-600'}`}>
+                                    {role}
+                                  </span>
+                                  <span className={`ml-auto inline-flex px-1.5 py-0.5 rounded text-xs ${ROLE_COLORS[role] ?? 'bg-gray-100 text-gray-600'}`}>
+                                    {role === 'admin' && 'Full access'}
+                                    {role === 'editor' && 'Can publish'}
+                                    {role === 'researcher' && 'Can submit'}
+                                    {role === 'reviewer' && 'Can review'}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                            <div className="flex gap-2 pt-2">
+                              <button
+                                type="button"
+                                disabled={isUpdatingRole || (pendingRoles[u._id] ?? []).length === 0}
+                                onClick={() => handleRoleSave(u)}
+                                className="flex-1 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded hover:bg-indigo-700 disabled:opacity-50"
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={selected}
-                                  disabled={isSelf || isUpdatingRole}
-                                  onChange={(e) => togglePendingRole(u, role, e.target.checked)}
-                                />
+                                {isUpdatingRole ? 'Saving…' : 'Save Roles'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => cancelEditRoles(u._id)}
+                                className="flex-1 py-1.5 border border-gray-300 text-gray-600 text-xs rounded hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* ── Display mode ── */
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {getUserRoles(u).map((role) => (
+                              <span
+                                key={role}
+                                className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${ROLE_COLORS[role] ?? 'bg-gray-100 text-gray-600'}`}
+                              >
                                 {role}
-                              </label>
-                            );
-                          })}
-                          {!isSelf && (
-                            <button
-                              type="button"
-                              disabled={isUpdatingRole}
-                              onClick={() => handleRoleSave(u)}
-                              className="text-xs px-2 py-1 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                            >
-                              {isUpdatingRole ? 'saving...' : 'Save'}
-                            </button>
-                          )}
-                        </div>
+                              </span>
+                            ))}
+                            {!isSelf && (
+                              <button
+                                type="button"
+                                onClick={() => startEditRoles(u)}
+                                className="ml-1 text-xs px-2 py-0.5 rounded border border-gray-300 text-gray-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              >
+                                ✎ Edit
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span

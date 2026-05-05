@@ -229,26 +229,30 @@ export function EditorDashboardPage() {
                         selectedManuscript?._id === m._id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
                       }`}
                     >
-                      <p className="font-medium text-gray-900 line-clamp-2">{m.title}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                                              <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                                                m.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
-                                                m.status === 'under-review' ? 'bg-purple-100 text-purple-700' :
-                                                m.status === 'revision-requested' ? 'bg-amber-100 text-amber-700' :
-                                                m.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                                                m.status === 'published' ? 'bg-emerald-100 text-emerald-700' :
-                                                'bg-gray-100 text-gray-700'
-                                              }`}>
-                                                {m.status}
-                                              </span>
-                                              <span className="text-xs text-gray-400">📄</span>
-                                            </div>
-                                            {m.authors?.[0]?.name && (
-                                                                    <p className="text-xs text-gray-500 mt-1">By: {m.authors[0].name}</p>
-                                                                  )}
-                                                                  {m.discipline && (
-                                                                    <p className="text-xs text-gray-400 mt-0.5">{m.discipline} • {m.methodology}</p>
-                                                                  )}
+                      <p className="font-medium text-gray-900 line-clamp-2 text-sm">{m.title}</p>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                          m.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
+                          m.status === 'under-review' ? 'bg-purple-100 text-purple-700' :
+                          m.status === 'revision-requested' ? 'bg-amber-100 text-amber-700' :
+                          m.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                          m.status === 'published' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {String(m.status).replace(/-/g, ' ')}
+                        </span>
+                      </div>
+                      {m.authors?.[0]?.name && (
+                        <p className="text-xs text-gray-500 mt-1">By: {m.authors[0].name}</p>
+                      )}
+                      {m.submittedAt && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Submitted: {new Date(m.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      )}
+                      {m.discipline && (
+                        <p className="text-xs text-gray-400 mt-0.5">{m.discipline}</p>
+                      )}
                     </button>
                   ))
                 )}
@@ -338,11 +342,22 @@ export function EditorDashboardPage() {
                   <div className="space-y-4">
                     {selectedManuscript.reviews.map((review, i) => (
                       <div key={i} className="border rounded-lg p-4 bg-gray-50">
-                        <div className="flex items-center gap-4 mb-2">
-                          <p className="text-sm font-medium text-gray-700">Reviewer {i + 1}</p>
-                          {review.submittedAt && (
+                        <div className="flex items-center gap-4 mb-2 flex-wrap">
+                          <p className="text-sm font-medium text-gray-700">
+                            Reviewer {i + 1}
+                            {review.reviewerId?.name && ` — ${review.reviewerId.name}`}
+                          </p>
+                          {review.submittedAt ? (
                             <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">
-                              Submitted
+                              Submitted {new Date(review.submittedAt).toLocaleDateString()}
+                            </span>
+                          ) : ['accepted', 'published'].includes(selectedManuscript.status) ? (
+                            <span className="text-xs px-2 py-1 bg-gray-100 text-gray-500 rounded">
+                              Review bypassed — decision made
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
+                              Pending — reviewer has not submitted yet
                             </span>
                           )}
                         </div>
@@ -353,7 +368,7 @@ export function EditorDashboardPage() {
                               <p className="text-sm text-gray-600">Score</p>
                               <div className="flex gap-1">
                                 {[1, 2, 3, 4, 5].map(s => (
-                                  <span key={s} className={s <= review.score ? '⭐' : '☆'} />
+                                  <span key={s} className={s <= (review.score || 0) ? '⭐' : '☆'} />
                                 ))}
                               </div>
                             </div>
@@ -369,7 +384,11 @@ export function EditorDashboardPage() {
                             </div>
                           </>
                         ) : (
-                          <p className="text-sm text-gray-500 italic">Pending review...</p>
+                          <p className="text-sm text-gray-500 italic">
+                            {['accepted', 'published'].includes(selectedManuscript.status)
+                              ? 'This review was not formally submitted through the system.'
+                              : 'Awaiting reviewer submission. Share the review link: /peer-review/' + selectedManuscript._id}
+                          </p>
                         )}
                       </div>
                     ))}
@@ -378,9 +397,15 @@ export function EditorDashboardPage() {
               )}
 
               {/* Actions Based on Status */}
-              {selectedManuscript.status === 'submitted' && !selectedManuscript.assignedEditor && (
+              {selectedManuscript.status === 'submitted' && (
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold mb-4">Assign Reviewers</h3>
+                  <h3 className="text-lg font-semibold mb-1">Assign or Re-assign Reviewers</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Select users below and click <strong>Assign Reviewers</strong>. Then share the review link with them:<br/>
+                    <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded select-all">
+                      {window.location.origin}/peer-review/{selectedManuscript._id}
+                    </span>
+                  </p>
 
                   <form onSubmit={handleAssignReviewers} className="space-y-4">
                     <div>

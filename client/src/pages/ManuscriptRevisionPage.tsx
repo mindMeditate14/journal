@@ -39,10 +39,6 @@ export default function ManuscriptRevisionPage() {
 
     setSubmitting(true);
     try {
-      await apiClient.patch(`/manuscripts/${manuscriptId}`, {
-        status: manuscript.status === 'revision-requested' ? 'submitted' : manuscript.status,
-      });
-      
       await apiClient.post(`/manuscripts/${manuscriptId}/working-document`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -67,6 +63,10 @@ export default function ManuscriptRevisionPage() {
   if (!manuscript) {
     return null;
   }
+
+  const reviewerFeedback = Array.isArray(manuscript.reviews)
+    ? manuscript.reviews.filter((review: any) => String(review?.feedback || '').trim())
+    : [];
 
   const statusColor = {
     draft: 'bg-purple-100 text-purple-800',
@@ -121,6 +121,24 @@ export default function ManuscriptRevisionPage() {
             <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded">
               <p className="font-medium text-amber-700 mb-1">Editor Notes:</p>
               <p className="text-amber-600 text-sm">{manuscript.editorNotes}</p>
+            </div>
+          )}
+
+          {reviewerFeedback.length > 0 && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <p className="font-medium text-blue-700 mb-2">Reviewer Feedback:</p>
+              <div className="space-y-3">
+                {reviewerFeedback.map((review: any, index: number) => (
+                  <div key={review?._id || index} className="bg-white border border-blue-100 rounded p-3">
+                    <p className="text-xs text-blue-700 mb-1">
+                      Reviewer {index + 1}
+                      {review.recommendation ? ` | Recommendation: ${String(review.recommendation).replace('-', ' ')}` : ''}
+                      {review.score ? ` | Score: ${review.score}/10` : ''}
+                    </p>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{review.feedback}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

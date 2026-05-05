@@ -76,6 +76,7 @@ export default function AdminUsersPage() {
             <option value="">All Roles</option>
             <option value="admin">Admin</option>
             <option value="editor">Editor</option>
+            <option value="reviewer">Reviewer</option>
             <option value="researcher">Researcher</option>
           </select>
         </div>
@@ -113,6 +114,7 @@ export default function AdminUsersPage() {
                         <option value="">Select Role</option>
                         <option value="admin">Admin</option>
                         <option value="editor">Editor</option>
+                        <option value="reviewer">Reviewer</option>
                         <option value="researcher">Researcher</option>
                       </select>
                       <button

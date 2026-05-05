@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../utils/authStore';
 import { Menu, X, Home, Search, BookOpen, Plus, Shield, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { ReactNode } from 'react';
 import { Role } from '../types';
 
 const hasRole = (role: Role, roles?: Role[], fallbackRole?: Role) => {
@@ -35,7 +36,7 @@ const NavItem = ({ icon: Icon, label, path, isActive, onClick, collapsed }: {
   </button>
 );
 
-export default function SidebarLayout() {
+export default function SidebarLayout({ children }: { children?: ReactNode }) {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
@@ -185,7 +186,7 @@ export default function SidebarLayout() {
 
         {/* Content */}
         <main className="flex-1 overflow-auto">
-          <Outlet />
+          {children || <Outlet />}
         </main>
       </div>
     </div>

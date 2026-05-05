@@ -111,7 +111,11 @@ export function PeerReviewPage() {
   };
 
   if (loading) {
-    return <div className="text-center py-12">Loading manuscript...</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-600">Loading manuscript...</p>
+      </div>
+    );
   }
 
   if (error) {
@@ -153,9 +157,15 @@ export function PeerReviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Peer Review Form</h1>
+        <a
+          href="/dashboard"
+          className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-800 mb-6"
+        >
+          ← Back to Dashboard
+        </a>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Peer Review Form</h1>
 
         {/* Manuscript Summary */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -180,7 +190,9 @@ export function PeerReviewPage() {
             <div>
               <p className="text-sm text-gray-600">Manuscript Preview</p>
               <div className="bg-gray-50 p-4 rounded max-h-48 overflow-y-auto text-sm">
-                {manuscript.body.substring(0, 1000)}...
+                {manuscript.body && manuscript.body.length > 1000
+                  ? manuscript.body.substring(0, 1000) + '...'
+                  : manuscript.body || 'No content available'}
               </div>
             </div>
 

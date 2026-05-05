@@ -47,7 +47,37 @@ export async function registerZenodoDOI(manuscript, journal) {
     const recordId = recordResponse.data.id;
     logger.info(`✓ Zenodo deposit created: ID ${recordId}`);
 
-    // Step 2: Publish deposit to get DOI
+    // Step 2: Update record to be metadata-only (since we host files on our own server)
+    logger.info('Marking deposit as metadata-only...');
+    await zenodoAPI.patch(`/deposit/depositions/${recordId}`, {
+      metadata: {
+        ...recordResponse.data.metadata,
+        title: manuscript.title,
+        description: manuscript.abstract,
+        creators: manuscript.authors.map(a => ({
+          name: a.name,
+          affiliation: a.affiliation || '',
+          orcid: a.orcid || '',
+        })),
+        keywords: manuscript.keywords || [],
+        license: 'cc-by',
+        access_right: 'open',
+        publication_type: 'article',
+        publication_date: new Date().toISOString().split('T')[0],
+        journal_title: journal?.title || 'NexusJournal',
+        upload_type: 'publication',
+        related_identifiers: [
+          {
+            identifier: manuscript.finalDocument?.url || '',
+            relation: 'isSupplementedBy',
+            resource_type: 'publication-article',
+          },
+        ],
+        communities: [{ identifier: 'nexusjournal' }],
+      },
+    });
+
+    // Step 3: Publish deposit to get DOI
     logger.info('Publishing deposit to get DOI...');
     const publishResponse = await zenodoAPI.post(
       `/deposit/depositions/${recordId}/actions/publish`

@@ -302,38 +302,37 @@ export default function DashboardPage() {
           </div>
         )}
 
-        
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900">Projects</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Projects</h3>
             <p className="text-3xl font-bold text-indigo-600 mt-2">{projects.length}</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900">Drafts</h3>
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Drafts</h3>
             <p className="text-3xl font-bold text-purple-600 mt-2">{draftCount}</p>
             <p className="text-xs text-gray-500 mt-1">Manuscripts in progress</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900">Submitted</h3>
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Submitted</h3>
             <p className="text-3xl font-bold text-amber-600 mt-2">
               {submissions.filter((s) => ['submitted', 'under-review', 'revision-requested', 'accepted'].includes(s.status)).length}
             </p>
             <p className="text-xs text-gray-500 mt-1">Under review</p>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900">Published</h3>
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Published</h3>
             <p className="text-3xl font-bold text-green-600 mt-2">{publishedCount}</p>
             <p className="text-xs text-gray-500 mt-1">Successfully published</p>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-900">My Projects</h2>
+            <h2 className="text-xl font-bold text-gray-900">My Projects</h2>
             <button
               onClick={() => navigate('/workspace/projects/new')}
               className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
@@ -363,9 +362,9 @@ export default function DashboardPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-lg shadow mt-8">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm mt-6">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-900">My Submissions</h2>
+            <h2 className="text-xl font-bold text-gray-900">My Submissions</h2>
             <button
               onClick={() => navigate('/manuscripts/create')}
               className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
@@ -456,42 +455,68 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Actions Column */}
-                                        <div className="flex flex-col gap-2 min-w-[120px]">
-                                          {(m.status === 'draft' || m.status === 'revision-requested') && (
-                                            <button
-                                              type="button"
-                                              onClick={() => navigate(`/manuscripts/${m._id}/revision`)}
-                                              className={`px-3 py-1.5 text-white text-sm rounded-lg hover:opacity-90 ${m.status === 'revision-requested' ? 'bg-amber-600' : 'bg-indigo-600'}`}
-                                            >
-                                              {m.status === 'revision-requested' ? '✏️ Revise' : '✏️ Edit'}
-                                            </button>
-                                          )}
-                                          {m.status === 'submitted' && (
-                                            <span className="px-3 py-1.5 bg-blue-100 text-blue-600 text-sm rounded-lg text-center">
-                                              Awaiting Review
-                                            </span>
-                                          )}
-                                          {m.status === 'under-review' && (
-                                            <span className="px-3 py-1.5 bg-amber-100 text-amber-600 text-sm rounded-lg text-center">
-                                              Under Review
-                                            </span>
-                                          )}
-                                          {m.status === 'accepted' && (
-                                            <span className="px-3 py-1.5 bg-green-100 text-green-600 text-sm rounded-lg text-center">
-                                              Approved
-                                            </span>
-                                          )}
-                                          {(m.status === 'draft' || m.status === 'revision-requested' || m.status === 'submitted' || m.status === 'under-review') && (
-                                            <button
-                                              type="button"
-                                              onClick={() => handleDeleteManuscript(m._id, m.title)}
-                                              disabled={deletingId === m._id}
-                                              className="px-3 py-1.5 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100 disabled:opacity-50"
-                                            >
-                                              {deletingId === m._id ? 'Deleting...' : '🗑 Delete'}
-                                            </button>
-                                          )}
-                                        </div>
+                    <div className="flex flex-col gap-2 min-w-[140px]">
+                      {m.status === 'draft' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/manuscripts/${m._id}/edit`)}
+                            className="px-3 py-1.5 text-white text-sm rounded-lg hover:opacity-90 bg-indigo-600"
+                          >
+                            ✏️ Edit Draft
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await apiClient.post('/manuscripts', { draftId: m._id });
+                                toast.success('Manuscript submitted for review!');
+                                await refreshSubmissions();
+                              } catch (error: any) {
+                                toast.error(error?.response?.data?.error || 'Failed to submit');
+                              }
+                            }}
+                            className="px-3 py-1.5 text-white text-sm rounded-lg hover:opacity-90 bg-emerald-600"
+                          >
+                            📤 Submit Now
+                          </button>
+                        </>
+                      )}
+                      {m.status === 'revision-requested' && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/manuscripts/${m._id}/revision`)}
+                          className="px-3 py-1.5 text-white text-sm rounded-lg hover:opacity-90 bg-amber-600"
+                        >
+                          ✏️ Revise
+                        </button>
+                      )}
+                      {m.status === 'submitted' && (
+                        <span className="px-3 py-1.5 bg-blue-100 text-blue-600 text-sm rounded-lg text-center">
+                          Awaiting Review
+                        </span>
+                      )}
+                      {m.status === 'under-review' && (
+                        <span className="px-3 py-1.5 bg-amber-100 text-amber-600 text-sm rounded-lg text-center">
+                          Under Review
+                        </span>
+                      )}
+                      {m.status === 'accepted' && (
+                        <span className="px-3 py-1.5 bg-green-100 text-green-600 text-sm rounded-lg text-center">
+                          Approved
+                        </span>
+                      )}
+                      {(m.status === 'draft' || m.status === 'revision-requested' || m.status === 'submitted' || m.status === 'under-review') && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteManuscript(m._id, m.title)}
+                          disabled={deletingId === m._id}
+                          className="px-3 py-1.5 bg-red-50 text-red-600 text-sm rounded-lg hover:bg-red-100 disabled:opacity-50"
+                        >
+                          {deletingId === m._id ? 'Deleting...' : '🗑 Delete'}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Working document upload for submitted/under-review */}

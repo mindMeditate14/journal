@@ -1,7 +1,7 @@
 import User from '../models/User.js';
 import logger from '../utils/logger.js';
 
-const ALLOWED_ROLES = ['admin', 'editor', 'researcher', 'practitioner', 'reader'];
+const ALLOWED_ROLES = ['admin', 'editor', 'researcher', 'reviewer', 'practitioner', 'reader'];
 const normalizeRoles = (role, roles) => {
   const next = Array.isArray(roles) && roles.length > 0 ? roles : (role ? [role] : []);
   const unique = [...new Set(next.filter(Boolean))];

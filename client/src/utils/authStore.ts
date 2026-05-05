@@ -13,12 +13,18 @@ interface AuthState {
   restoreSession: () => void;
 }
 
+// Read localStorage synchronously at module load time — no async, no flicker
+const _token = localStorage.getItem('nexusjournal_access_token');
+const _userRaw = localStorage.getItem('nexusjournal_user');
+const _refreshToken = localStorage.getItem('nexusjournal_refresh_token');
+const _user: User | null = (_token && _userRaw && _refreshToken) ? JSON.parse(_userRaw) : null;
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  accessToken: null,
-  refreshToken: null,
-  isAuthenticated: false,
-  isLoading: true,
+  user: _user,
+  accessToken: _token,
+  refreshToken: _refreshToken,
+  isAuthenticated: !!_user,
+  isLoading: false,
   login: (user, accessToken, refreshToken) => {
     localStorage.setItem('nexusjournal_access_token', accessToken);
     localStorage.setItem('nexusjournal_refresh_token', refreshToken);
@@ -43,20 +49,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   setLoading: (loading) => set({ isLoading: loading }),
   restoreSession: () => {
-    const token = localStorage.getItem('nexusjournal_access_token');
-    const user = localStorage.getItem('nexusjournal_user');
-    const refreshToken = localStorage.getItem('nexusjournal_refresh_token');
-
-    if (token && user && refreshToken) {
-      set({
-        accessToken: token,
-        user: JSON.parse(user),
-        refreshToken,
-        isAuthenticated: true,
-        isLoading: false,
-      });
-    } else {
-      set({ isLoading: false });
-    }
+    // No-op: session is already restored synchronously at startup
   },
 }));

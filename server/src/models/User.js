@@ -33,11 +33,11 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['admin', 'editor', 'researcher', 'practitioner', 'reader'],
+      enum: ['admin', 'editor', 'researcher', 'reviewer', 'practitioner', 'reader'],
       index: true,
     },
     roles: {
-      type: [{ type: String, enum: ['admin', 'editor', 'researcher', 'practitioner', 'reader'] }],
+      type: [{ type: String, enum: ['admin', 'editor', 'researcher', 'reviewer', 'practitioner', 'reader'] }],
       default: ['researcher'],
       index: true,
     },

@@ -16,6 +16,7 @@ import {
   deleteManuscript,
   submitExistingPaper,
   submitManuscript,
+  submitManuscriptById,
   listManuscripts,
   viewManuscript,
   updateManuscript,
@@ -72,6 +73,7 @@ router.post('/ai/generate-from-practice-data', authMiddleware, generateFromPract
 
 // Author routes
 router.post('/', authMiddleware, submitManuscript);
+router.post('/:id/submit', authMiddleware, submitManuscriptById);
 router.get('/', authMiddleware, listManuscripts);
 router.get('/:id', authMiddleware, viewManuscript);
 router.delete('/:id', authMiddleware, deleteManuscript);

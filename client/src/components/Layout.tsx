@@ -18,6 +18,7 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const isAdmin = hasRole('admin', user?.roles, user?.role);
   const isEditor = hasRole('editor', user?.roles, user?.role) || isAdmin;
+  const isReviewer = hasRole('reviewer', user?.roles, user?.role);
   const roleBadges = Array.isArray(user?.roles) && user.roles.length > 0
     ? user.roles
     : (user?.role ? [user.role] : []);
@@ -95,7 +96,9 @@ export default function Layout() {
                       ? 'bg-amber-100 text-amber-800'
                       : role === 'editor'
                         ? 'bg-violet-100 text-violet-800'
-                        : 'bg-indigo-100 text-indigo-800'
+                        : role === 'reviewer'
+                          ? 'bg-teal-100 text-teal-800'
+                          : 'bg-indigo-100 text-indigo-800'
                   }`}
                 >
                   {role.toUpperCase()}
