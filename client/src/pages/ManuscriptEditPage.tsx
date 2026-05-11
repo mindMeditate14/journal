@@ -327,7 +327,7 @@ export default function ManuscriptEditPage() {
               <h2 className="text-lg font-semibold text-gray-900">Working Document</h2>
               <a
                 href={manuscriptTemplateFile}
-                download="NexusJournal_Manuscript_Template.docx"
+                download="TradMedInt_Manuscript_Template.docx"
                 className="text-sm bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded hover:bg-emerald-100"
               >
                 Download Journal Template (.docx)

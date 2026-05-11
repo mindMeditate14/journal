@@ -31,6 +31,8 @@ export interface Journal {
     role?: string;
   }>;
   doi: string;
+  issn?: string;
+  isOpen?: boolean;
   status: 'draft' | 'submitted' | 'under_review' | 'published' | 'archived';
   publishedAt: Date;
   owner: string;
@@ -48,6 +50,7 @@ export interface Paper {
   abstract: string;
   doi?: string;
   publicationYear?: number;
+  publishedAt?: string | Date;
   citationsCount: number;
   referencesCount: number;
   isOpenAccess: boolean;
@@ -64,6 +67,14 @@ export interface Paper {
   keywords: string[];
   topics: string[];
   referencesOpenAlex?: string[];
+  references?: string[];
+  body?: string;
+  sections?: Array<{
+    title: string;
+    content: string;
+    order?: number;
+    type?: string;
+  }>;
   urls?: {
     landing?: string;
     source?: string;

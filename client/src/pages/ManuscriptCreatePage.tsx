@@ -188,7 +188,7 @@ export default function ManuscriptCreatePage() {
             <span className="text-amber-700 text-sm font-medium">Manuscript template available:</span>
             <a
               href={manuscriptTemplateFile}
-              download="NexusJournal-Manuscript-Template.docx"
+              download="TradMedInt-Manuscript-Template.docx"
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-800 underline"
             >
               Download Template (.docx)
@@ -381,7 +381,7 @@ export default function ManuscriptCreatePage() {
                 <h2 className="text-lg font-semibold text-gray-900">5. Working Document</h2>
                 <a
                   href={manuscriptTemplateFile}
-                  download="NexusJournal_Manuscript_Template.docx"
+                  download="TradMedInt_Manuscript_Template.docx"
                   className="text-sm bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded hover:bg-emerald-100"
                 >
                   Download Journal Template (.docx)

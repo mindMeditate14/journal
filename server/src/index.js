@@ -33,7 +33,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }));
 
 // Serve uploaded working/final manuscript files.
-app.use('/uploads', express.static(path.resolve(process.cwd(), '../public/uploads')));
+app.use('/uploads', express.static(path.resolve(process.cwd(), '../uploads')));
 
 // 5xx rate alerting — must be before routes
 app.use(fiveXxMiddleware);

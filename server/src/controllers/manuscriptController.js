@@ -75,7 +75,7 @@ const parseAuthorsInput = (rawAuthors = '') => {
 };
 
 const buildStoredDocumentPayload = async (file, userId) => {
-  const uploadsRoot = path.resolve(process.cwd(), '../public/uploads/manuscripts');
+  const uploadsRoot = path.resolve(process.cwd(), '../uploads/manuscripts');
   await fs.mkdir(uploadsRoot, { recursive: true });
 
   const ext = path.extname(file.originalname || '') || '';
@@ -1393,16 +1393,10 @@ export async function publishManuscript(req, res, next) {
         });
       }
 
-      let doiResult = null;
-      try {
-        doiResult = await registerZenodoDOI(manuscript, manuscript.journalId);
-      } catch (doiError) {
-        logger.warn(`DOI registration skipped/failed, publishing with uploaded document only: ${doiError.message}`);
-      }
+      // DOI registration is required — if it fails, publication is blocked.
+      const doiResult = await registerZenodoDOI(manuscript, manuscript.journalId);
 
-      if (doiResult?.doi) {
-        manuscript.doi = doiResult.doi;
-      }
+      manuscript.doi = doiResult.doi;
       manuscript.publishedAt = new Date();
       manuscript.status = 'published';
 
@@ -1427,19 +1421,25 @@ export async function publishManuscript(req, res, next) {
           paperAuthors.push({ name: 'Unknown Author', affiliation: '', orcid: '' });
         }
 
+        const pdfAbsoluteUrl = manuscript.finalDocument.url
+          ? `https://journal.mind-meditate.com${manuscript.finalDocument.url}`
+          : '';
+
         await Paper.create({
           title: manuscript.title || 'Untitled',
+          normalizedTitle: (manuscript.title || '').toLowerCase().trim(),
           abstract: manuscript.abstract || '',
           authors: paperAuthors,
           publishedAt: manuscript.publishedAt,
+          publicationYear: new Date(manuscript.publishedAt).getFullYear(),
           doi: manuscript.doi || undefined,
           journal: {
-            name: manuscript.journalId.title || 'Unknown Journal',
+            name: manuscript.journalId.title || 'TradMed International',
           },
           sourceProvenance: [
             {
               source: 'manual',
-              sourceId: manuscript._id,
+              sourceId: manuscript._id.toString(),
               confidence: 0.98,
               fetchedAt: new Date(),
             },
@@ -1447,10 +1447,21 @@ export async function publishManuscript(req, res, next) {
           keywords: manuscript.keywords || [],
           topics: manuscript.metadata?.sectionHeadings || [],
           isOpenAccess: true,
+          qualityScore: 80,
+          // Full-text content from manuscript
+          body: manuscript.body || manuscript.content || '',
+          sections: (manuscript.sections || []).map(s => ({
+            title: s.title || '',
+            content: s.content || '',
+            order: s.order ?? 0,
+            type: s.type || 'other',
+          })),
+          references: manuscript.metadata?.references || [],
+          referencesCount: (manuscript.metadata?.references || []).length,
           urls: {
-            landing: manuscript.finalDocument.url,
-            source: manuscript.finalDocument.url,
-            pdf: manuscript.finalDocument.url,
+            landing: pdfAbsoluteUrl,
+            source: pdfAbsoluteUrl,
+            pdf: pdfAbsoluteUrl,
           },
         });
         logger.info(`✓ Paper record created for manuscript: ${manuscript._id}`);
@@ -1505,11 +1516,11 @@ async function sendSubmissionConfirmationEmail(email, authorName, submissionId, 
   const htmlContent = `
     <h2>Manuscript Submission Received</h2>
     <p>Dear ${authorName},</p>
-    <p>Thank you for submitting your manuscript to our journal.</p>
+    <p>Thank you for submitting your manuscript to <strong>TradMed International</strong>.</p>
     <p><strong>Submission ID:</strong> ${submissionId}</p>
     <p><strong>Title:</strong> ${title}</p>
     <p>Your manuscript has been received and will be reviewed by our editorial team within 5-7 business days. You can track the status of your submission at any time by logging into your account.</p>
-    <p>Best regards,<br/>Editorial Team</p>
+    <p>Best regards,<br/>TradMed International Editorial Team</p>
   `;
 
   await emailService.send({

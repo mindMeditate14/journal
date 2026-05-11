@@ -65,7 +65,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
       {/* Logo */}
       <div className={`p-4 border-b ${collapsed ? 'text-center' : ''}`}>
         {!collapsed && (
-          <h1 className="text-xl font-bold text-indigo-600">NexusJournal</h1>
+          <h1 className="text-xl font-bold text-indigo-600">TradMed International</h1>
         )}
         {collapsed && (
           <span className="text-2xl">📚</span>
@@ -141,7 +141,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl">
             <div className="flex justify-between items-center p-4 border-b">
-              <h1 className="text-xl font-bold text-indigo-600">NexusJournal</h1>
+              <h1 className="text-xl font-bold text-indigo-600">TradMed International</h1>
               <button onClick={() => setMobileOpen(false)} className="text-gray-500">
                 <X size={24} />
               </button>
@@ -175,7 +175,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header */}
         <header className="md:hidden bg-white shadow-sm p-4 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-indigo-600">NexusJournal</h1>
+          <h1 className="text-lg font-bold text-indigo-600">TradMed International</h1>
           <button 
             onClick={() => setMobileOpen(true)}
             className="p-2 text-gray-600"

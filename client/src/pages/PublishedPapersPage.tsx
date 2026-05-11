@@ -50,7 +50,7 @@ export default function PublishedPapersPage() {
       {isGuest && (
         <header className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-            <span className="text-lg font-bold tracking-tight text-indigo-700">NexusJournal</span>
+            <span className="text-lg font-bold tracking-tight text-indigo-700">TradMed International</span>
             <div className="flex items-center gap-3">
               <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-indigo-700">Sign In</Link>
               <Link to="/register" className="text-sm font-semibold bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition-colors">
@@ -78,10 +78,10 @@ export default function PublishedPapersPage() {
           </div>
 
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight mb-4 max-w-3xl">
-            NexusJournal of<br className="hidden md:block" /> Traditional Medicine
+            TradMed International
           </h1>
           <p className="text-indigo-200 text-lg max-w-2xl leading-relaxed mb-10">
-            A multidisciplinary platform publishing rigorous research in Ayurveda, Siddha, and integrated traditional healthcare sciences.
+            A global open-access publisher for traditional, complementary and integrative medicine research.
           </p>
 
           {/* Search bar */}
@@ -240,7 +240,7 @@ export default function PublishedPapersPage() {
                     {/* Footer row */}
                     <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                       <span className="text-xs text-gray-400 truncate max-w-[60%]">
-                        {paper.journal?.name || 'NexusJournal'}
+                        {paper.journal?.name || 'TradMed International'}
                         {paper.doi && (
                           <> · <a
                             href={`https://doi.org/${paper.doi}`}
@@ -292,7 +292,7 @@ export default function PublishedPapersPage() {
           <div>
             <h3 className="text-2xl font-bold mb-2">Ready to publish your research?</h3>
             <p className="text-indigo-100 max-w-lg">
-              NexusJournal welcomes original research, case studies, and reviews in traditional medicine and integrative healthcare.
+              TradMed International welcomes original research, case studies, and reviews in traditional medicine and integrative healthcare.
             </p>
           </div>
           {isGuest ? (
@@ -329,7 +329,7 @@ export default function PublishedPapersPage() {
               Aligned with India's Ministry of AYUSH
             </h3>
             <p className="text-gray-700 leading-relaxed mb-3 max-w-3xl">
-              NexusJournal supports the research objectives of the{' '}
+              TradMed International supports the research objectives of the{' '}
               <strong>Ministry of AYUSH</strong> (Ayurveda, Yoga & Naturopathy, Unani, Siddha, and Homeopathy),
               Government of India. Our editorial scope — spanning Ayurveda, Siddha medicine, herbal pharmacology,
               and integrative health — directly serves the mission of the{' '}
@@ -337,7 +337,7 @@ export default function PublishedPapersPage() {
               standardisation, and global dissemination.
             </p>
             <p className="text-sm text-gray-500 max-w-3xl">
-              NexusJournal is an independent academic platform and is not officially affiliated with or endorsed by
+              TradMed International is an independent academic platform and is not officially affiliated with or endorsed by
               the Ministry of AYUSH. We align with its research priorities and welcome submissions that advance
               AYUSH sciences through rigorous peer-reviewed study.
             </p>
@@ -362,7 +362,7 @@ export default function PublishedPapersPage() {
           <p className="text-center text-sm text-gray-500 max-w-2xl mx-auto mb-10">
             Bibliographic metadata on this platform is sourced from publicly available open-access scholarly
             databases. All copyright in the original works remains with the respective authors and publishers.
-            NexusJournal does not host, reproduce, or claim ownership of any third-party content.
+            TradMed International does not host, reproduce, or claim ownership of any third-party content.
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -466,8 +466,7 @@ export default function PublishedPapersPage() {
       <footer className="bg-slate-900 text-slate-400 text-sm">
         <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <span className="font-bold text-white text-base">NexusJournal</span>
-            <span className="ml-3 text-slate-500">of Traditional Medicine</span>
+            <span className="font-bold text-white text-base">TradMed International</span>
           </div>
           <div className="flex gap-6 text-xs">
             <span>ISSN (Online): Pending</span>
@@ -476,7 +475,7 @@ export default function PublishedPapersPage() {
             <span>·</span>
             <span>Open Access</span>
           </div>
-          <div className="text-xs text-slate-500">© {new Date().getFullYear()} NexusJournal. All rights reserved.</div>
+          <div className="text-xs text-slate-500">© {new Date().getFullYear()} TradMed International. All rights reserved.</div>
         </div>
       </footer>
     </div>

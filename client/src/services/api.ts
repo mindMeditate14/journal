@@ -35,6 +35,9 @@ export const journalAPI = {
     const { data } = await apiClient.patch(`/journals/${id}`, updates);
     return data;
   },
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/journals/${id}`);
+  },
 };
 
 export const manuscriptAPI = {

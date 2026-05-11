@@ -1,3 +1,4 @@
+import Journal from '../models/Journal.js';
 import {
   createJournal,
   getJournalById,
@@ -5,6 +6,19 @@ import {
   updateJournal,
 } from '../services/journalService.js';
 import logger from '../utils/logger.js';
+
+export const deleteJournal = async (req, res, next) => {
+  try {
+    const journal = await Journal.findByIdAndDelete(req.params.id);
+    if (!journal) {
+      return res.status(404).json({ error: 'Journal not found' });
+    }
+    logger.info(`Admin deleted journal: ${req.params.id} (${journal.title})`);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const create = async (req, res, next) => {
   try {

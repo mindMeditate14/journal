@@ -34,7 +34,7 @@ export default function Layout() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-indigo-600">NexusJournal</h1>
+            <h1 className="text-2xl font-bold text-indigo-600">TradMed International</h1>
           </div>
 
           <nav className="hidden md:flex items-center gap-6">

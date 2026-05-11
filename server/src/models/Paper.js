@@ -57,6 +57,23 @@ const paperSchema = new mongoose.Schema(
     sourceProvenance: { type: [sourceProvenanceSchema], default: [] },
     qualityScore: { type: Number, min: 0, max: 100, default: 50 },
     trustFlags: { type: [String], default: [] },
+    // Full-text fields — populated at publish time from manuscript
+    body: { type: String, default: '' },
+    sections: {
+      type: [
+        {
+          title: String,
+          content: String,
+          order: Number,
+          type: {
+            type: String,
+            enum: ['introduction', 'methods', 'results', 'discussion', 'conclusion', 'references', 'other'],
+          },
+        },
+      ],
+      default: [],
+    },
+    references: { type: [String], default: [] },
   },
   { timestamps: true }
 );
