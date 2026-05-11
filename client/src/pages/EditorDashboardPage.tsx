@@ -81,6 +81,13 @@ export function EditorDashboardPage() {
     }
   };
 
+  const refreshSelectedManuscript = async () => {
+    if (!selectedManuscript?._id) return;
+    await handleSelectManuscript(selectedManuscript._id);
+    await fetchSubmissions();
+    toast.success('Refreshed');
+  };
+
   const handleAssignReviewers = async (e) => {
     e.preventDefault();
 
@@ -245,6 +252,28 @@ export function EditorDashboardPage() {
                       {m.authors?.[0]?.name && (
                         <p className="text-xs text-gray-500 mt-1">By: {m.authors[0].name}</p>
                       )}
+                      {(() => {
+                        const reviews = m.reviews || [];
+                        const isFinished = ['accepted', 'published', 'rejected'].includes(m.status);
+                        if (isFinished || reviews.length === 0) return null;
+                        const reviewerNames = reviews
+                          .map((r: any) => r.reviewerId?.name || r.reviewerName)
+                          .filter(Boolean);
+                        const submitted = reviews.filter((r: any) => r.submittedAt).length;
+                        const total = reviews.length;
+                        if (reviewerNames.length > 0) {
+                          return (
+                            <p className="text-xs text-teal-600 mt-0.5">
+                              Reviewers: {reviewerNames.join(', ')}{submitted > 0 ? ` (${submitted}/${total} done)` : ''}
+                            </p>
+                          );
+                        }
+                        return submitted === total && total > 0 ? (
+                          <p className="text-xs text-green-600 mt-0.5">{total} review{total > 1 ? 's' : ''} submitted</p>
+                        ) : (
+                          <p className="text-xs text-amber-600 mt-0.5">{submitted}/{total} reviews submitted</p>
+                        );
+                      })()}
                       {m.submittedAt && (
                         <p className="text-xs text-gray-400 mt-0.5">
                           Submitted: {new Date(m.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -265,7 +294,17 @@ export function EditorDashboardPage() {
             <div className="lg:col-span-2 space-y-6">
               {/* Manuscript Info */}
               <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-2xl font-bold mb-4">{selectedManuscript.title}</h2>
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <h2 className="text-2xl font-bold">{selectedManuscript.title}</h2>
+                  <button
+                    type="button"
+                    onClick={refreshSelectedManuscript}
+                    className="shrink-0 px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600"
+                    title="Reload latest data from server"
+                  >
+                    ↻ Refresh
+                  </button>
+                </div>
 
                 <div className="space-y-3 mb-6">
                   <div>

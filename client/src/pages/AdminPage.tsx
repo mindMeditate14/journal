@@ -3,7 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { adminAPI, journalAPI } from '../services/api';
 import { AdminUser, AdminStats, Role, Journal } from '../types';
 import { useAuthStore } from '../utils/authStore';
+import apiClient from '../api/client';
 import toast from 'react-hot-toast';
+
+const MS_STATUSES = ['draft','submitted','under-review','revision-requested','accepted','published','rejected'] as const;
+const MS_STATUS_COLORS: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-600',
+  submitted: 'bg-blue-100 text-blue-700',
+  'under-review': 'bg-purple-100 text-purple-700',
+  'revision-requested': 'bg-amber-100 text-amber-700',
+  accepted: 'bg-green-100 text-green-700',
+  published: 'bg-emerald-100 text-emerald-700',
+  rejected: 'bg-rose-100 text-rose-700',
+};
 
 const ROLES: Role[] = ['admin', 'editor', 'researcher', 'reviewer'];
 
@@ -25,6 +37,9 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const currentUserId = useAuthStore((state) => state.user?._id);
 
+  const [activeTab, setActiveTab] = useState<'users' | 'manuscripts'>('users');
+
+  // ── Users tab state ──
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
@@ -35,6 +50,18 @@ export default function AdminPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
   const [pendingRoles, setPendingRoles] = useState<Record<string, Role[]>>({});
+
+  // ── Manuscripts tab state ──
+  const [manuscripts, setManuscripts] = useState<any[]>([]);
+  const [msTotal, setMsTotal] = useState(0);
+  const [msPage, setMsPage] = useState(1);
+  const [msSearch, setMsSearch] = useState('');
+  const [msStatus, setMsStatus] = useState('');
+  const [loadingMs, setLoadingMs] = useState(false);
+  const [selectedMs, setSelectedMs] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
+  const [savingMs, setSavingMs] = useState(false);
+  const MS_LIMIT = 15;
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -75,6 +102,63 @@ export default function AdminPage() {
   useEffect(() => {
     loadUsers(1);
   }, [roleFilter]);
+
+  // ── Manuscript tab logic ──
+  const loadManuscripts = useCallback(async (targetPage = 1) => {
+    setLoadingMs(true);
+    try {
+      const params: any = { page: targetPage, limit: MS_LIMIT };
+      if (msStatus) params.status = msStatus;
+      const { data } = await apiClient.get('/manuscripts', { params });
+      setManuscripts(data.manuscripts || []);
+      setMsTotal(data.pagination?.total || 0);
+      setMsPage(data.pagination?.page || 1);
+    } catch {
+      toast.error('Failed to load manuscripts');
+    } finally {
+      setLoadingMs(false);
+    }
+  }, [msStatus, MS_LIMIT]);
+
+  useEffect(() => {
+    if (activeTab === 'manuscripts') loadManuscripts(1);
+  }, [activeTab, msStatus]);
+
+  const handleSelectMs = (ms: any) => {
+    setSelectedMs(ms);
+    setEditForm({
+      title: ms.title || '',
+      abstract: ms.abstract || '',
+      keywords: Array.isArray(ms.keywords) ? ms.keywords.join(', ') : (ms.keywords || ''),
+      discipline: ms.discipline || '',
+      status: ms.status || '',
+    });
+  };
+
+  const handleSaveMs = async () => {
+    if (!selectedMs) return;
+    setSavingMs(true);
+    try {
+      const payload: any = {
+        title: editForm.title.trim(),
+        abstract: editForm.abstract.trim(),
+        keywords: editForm.keywords.split(',').map((k: string) => k.trim()).filter(Boolean),
+        discipline: editForm.discipline.trim(),
+        status: editForm.status,
+      };
+      const { data } = await apiClient.patch(`/manuscripts/${selectedMs._id}`, payload);
+      const updated = data.manuscript || { ...selectedMs, ...payload };
+      setManuscripts(prev => prev.map(m => m._id === selectedMs._id ? { ...m, ...updated } : m));
+      setSelectedMs({ ...selectedMs, ...updated });
+      toast.success('Manuscript updated');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to save');
+    } finally {
+      setSavingMs(false);
+    }
+  };
+
+  const msTotalPages = Math.max(1, Math.ceil(msTotal / MS_LIMIT));
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,8 +272,28 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* Stats cards */}
-        {stats && (
+        {/* Tabs */}
+        <div className="mt-6 border-b border-gray-200">
+          <nav className="flex gap-6">
+            {(['users', 'manuscripts'] as const).map(tab => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`pb-3 text-sm font-medium capitalize border-b-2 transition-colors ${
+                  activeTab === tab
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab === 'users' ? 'Users & Roles' : 'Manuscripts'}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {activeTab === 'users' && (<>
+          {stats && (
           <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <div className="text-2xl font-bold text-gray-900">{stats.totalUsers}</div>
@@ -510,6 +614,191 @@ export default function AdminPage() {
             )}
           </div>
         </div>
+        </>)}
+
+        {activeTab === 'manuscripts' && (
+          <div className="mt-6">
+            {/* Manuscript filters */}
+            <div className="flex flex-wrap gap-3 mb-4">
+              <select
+                value={msStatus}
+                onChange={(e) => setMsStatus(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">All statuses</option>
+                {MS_STATUSES.map(s => (
+                  <option key={s} value={s}>{s.replace(/-/g, ' ')}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => loadManuscripts(1)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
+              >
+                Refresh
+              </button>
+              <span className="ml-auto text-sm text-gray-500 self-center">{msTotal} manuscript{msTotal !== 1 ? 's' : ''}</span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* List */}
+              <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 overflow-hidden">
+                {loadingMs ? (
+                  <div className="p-6 text-center text-sm text-gray-500">Loading…</div>
+                ) : manuscripts.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-500">No manuscripts found.</div>
+                ) : (
+                  <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+                    {manuscripts.map(m => {
+                      const reviews = m.reviews || [];
+                      const isFinished = ['accepted', 'published', 'rejected'].includes(m.status);
+                      const reviewerNames = reviews
+                        .map((r: any) => r.reviewerId?.name || r.reviewerName)
+                        .filter(Boolean);
+                      const submitted = reviews.filter((r: any) => r.submittedAt).length;
+                      return (
+                        <button
+                          key={m._id}
+                          type="button"
+                          onClick={() => handleSelectMs(m)}
+                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition ${selectedMs?._id === m._id ? 'bg-indigo-50 border-l-4 border-indigo-600' : ''}`}
+                        >
+                          <p className="text-sm font-medium text-gray-900 line-clamp-2">{m.title}</p>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${MS_STATUS_COLORS[m.status] || 'bg-gray-100 text-gray-600'}`}>
+                              {String(m.status).replace(/-/g, ' ')}
+                            </span>
+                          </div>
+                          {m.submittedBy?.name && (
+                            <p className="text-xs text-gray-500 mt-0.5">By: {m.submittedBy?.name || m.submittedBy?.email}</p>
+                          )}
+                          {!isFinished && reviewerNames.length > 0 && (
+                            <p className="text-xs text-teal-600 mt-0.5">Reviewers: {reviewerNames.join(', ')}{submitted > 0 ? ` (${submitted}/${reviews.length} done)` : ''}</p>
+                          )}
+                          {!isFinished && reviews.length > 0 && reviewerNames.length === 0 && (
+                            <p className="text-xs text-amber-600 mt-0.5">{submitted}/{reviews.length} reviews submitted</p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {msTotalPages > 1 && (
+                  <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm">
+                    <button type="button" onClick={() => loadManuscripts(msPage - 1)} disabled={msPage <= 1 || loadingMs} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">Prev</button>
+                    <span className="text-gray-600">{msPage}/{msTotalPages}</span>
+                    <button type="button" onClick={() => loadManuscripts(msPage + 1)} disabled={msPage >= msTotalPages || loadingMs} className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">Next</button>
+                  </div>
+                )}
+              </div>
+
+              {/* Edit panel */}
+              <div className="lg:col-span-3">
+                {!selectedMs ? (
+                  <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                    Select a manuscript to view and edit
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs text-gray-400 font-mono">{selectedMs.submissionId || selectedMs._id}</p>
+                        <h3 className="text-base font-semibold text-gray-900 mt-0.5">{selectedMs.title}</h3>
+                      </div>
+                      <a href={`/manuscripts/${selectedMs._id}`} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs text-indigo-600 hover:underline">View →</a>
+                    </div>
+
+                    {/* Reviewers info (read-only) */}
+                    {selectedMs.reviews?.length > 0 && (
+                      <div className="bg-gray-50 rounded-lg px-4 py-3">
+                        <p className="text-xs font-semibold text-gray-600 mb-1.5">Assigned Reviewers</p>
+                        <div className="space-y-1">
+                          {selectedMs.reviews.map((r: any, i: number) => (
+                            <div key={i} className="flex items-center gap-2 text-sm">
+                              <span className="text-gray-700 font-medium">{r.reviewerId?.name || r.reviewerName || `Reviewer ${i + 1}`}</span>
+                              {r.reviewerId?.email && <span className="text-gray-400 text-xs">({r.reviewerId.email})</span>}
+                              {r.submittedAt ? (
+                                <span className="ml-auto text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">Submitted</span>
+                              ) : (
+                                <span className="ml-auto text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">Pending</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Editable fields */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+                      <select
+                        value={editForm.status}
+                        onChange={e => setEditForm((f: any) => ({ ...f, status: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                      >
+                        {MS_STATUSES.map(s => (
+                          <option key={s} value={s}>{s.replace(/-/g, ' ')}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+                      <input
+                        type="text"
+                        value={editForm.title}
+                        onChange={e => setEditForm((f: any) => ({ ...f, title: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Abstract</label>
+                      <textarea
+                        rows={5}
+                        value={editForm.abstract}
+                        onChange={e => setEditForm((f: any) => ({ ...f, abstract: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 resize-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Discipline</label>
+                        <input
+                          type="text"
+                          value={editForm.discipline}
+                          onChange={e => setEditForm((f: any) => ({ ...f, discipline: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Keywords <span className="text-gray-400 font-normal">(comma-separated)</span></label>
+                        <input
+                          type="text"
+                          value={editForm.keywords}
+                          onChange={e => setEditForm((f: any) => ({ ...f, keywords: e.target.value }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleSaveMs}
+                        disabled={savingMs}
+                        className="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {savingMs ? 'Saving…' : 'Save Changes'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

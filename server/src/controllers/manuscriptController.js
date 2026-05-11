@@ -922,6 +922,7 @@ export async function listManuscripts(req, res, next) {
 
         const manuscripts = await Manuscript.find(filter)
       .populate('journalId', 'title')
+      .populate('reviews.reviewerId', 'name email')
       .sort({ updatedAt: -1 })
       .limit(parseInt(limit))
       .skip(skip);
@@ -1016,17 +1017,23 @@ export async function updateManuscript(req, res, next) {
       return res.status(404).json({ error: 'Manuscript not found' });
     }
 
-    // Only author can edit
-    if (manuscript.submittedBy.toString() !== req.user._id.toString()) {
+    const userRoles = Array.isArray(req.roles) ? req.roles : [req.user.role].filter(Boolean);
+    const isAdminEdit = userRoles.includes('admin');
+    const isAuthorEdit = manuscript.submittedBy.toString() === req.user._id.toString();
+
+    if (!isAdminEdit && !isAuthorEdit) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    // Allow editing for drafts and revision cycles.
-    if (!['draft', 'revision-requested', 'rejected'].includes(manuscript.status)) {
+    // Authors can only edit draft/revision; admins can edit any status
+    if (!isAdminEdit && !['draft', 'revision-requested', 'rejected'].includes(manuscript.status)) {
       return res.status(400).json({ error: 'Can only edit draft or revision manuscripts' });
     }
 
     const { title, abstract, keywords, authors, body, discipline, methodology, fundingStatement, conflictOfInterest, dataAvailability } = req.body;
+
+    // Admin-only: change status
+    if (isAdminEdit && req.body.status !== undefined) manuscript.status = req.body.status;
 
     if (title !== undefined) manuscript.title = title.trim();
     if (abstract !== undefined) manuscript.abstract = abstract.trim();

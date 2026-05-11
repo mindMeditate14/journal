@@ -23,6 +23,7 @@ import ManuscriptCreatePage from './pages/ManuscriptCreatePage';
 import { SubmitManuscriptPage } from './pages/SubmitManuscriptPage';
 import { EditorDashboardPage } from './pages/EditorDashboardPage';
 import { PeerReviewPage } from './pages/PeerReviewPage';
+import { MyReviewsPage } from './pages/MyReviewsPage';
 import PublishedPapersPage from './pages/PublishedPapersPage';
 import PublishedPapersWrapper from './components/PublishedPapersWrapper';
 import PaperViewPage from './pages/PaperViewPage';
@@ -152,6 +153,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <PeerReviewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-reviews"
+            element={
+              <ProtectedRoute allowedRoles={['reviewer', 'editor', 'admin']}>
+                <MyReviewsPage />
               </ProtectedRoute>
             }
           />

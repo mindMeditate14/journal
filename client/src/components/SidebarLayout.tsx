@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../utils/authStore';
-import { Menu, X, Home, Search, BookOpen, Plus, Shield, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Menu, X, Home, Search, BookOpen, Plus, Shield, LogOut, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 import { ReactNode } from 'react';
 import { Role } from '../types';
@@ -46,6 +46,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
 
   const isAdmin = hasRole('admin', user?.roles, user?.role);
   const isEditor = hasRole('editor', user?.roles, user?.role) || isAdmin;
+  const isReviewer = hasRole('reviewer', user?.roles, user?.role);
 
   const handleLogout = () => {
     logout();
@@ -56,6 +57,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
     { icon: Home, label: 'Dashboard', path: '/dashboard' },
     { icon: BookOpen, label: 'Published Papers', path: '/papers' },
     { icon: Plus, label: 'Create Manuscript', path: '/manuscripts/create' },
+    ...(isReviewer || isEditor ? [{ icon: ClipboardList, label: 'My Reviews', path: '/my-reviews' }] : []),
     ...(isEditor ? [{ icon: Shield, label: 'Editor', path: '/editor/dashboard' }] : []),
     ...(isAdmin ? [{ icon: Shield, label: 'Admin', path: '/admin' }] : []),
   ];
