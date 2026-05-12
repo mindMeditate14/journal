@@ -5,6 +5,7 @@ import { AdminUser, AdminStats, Role, Journal } from '../types';
 import { useAuthStore } from '../utils/authStore';
 import apiClient from '../api/client';
 import toast from 'react-hot-toast';
+import { invalidateClassificationsCache } from '../hooks/useClassifications';
 
 const MS_STATUSES = ['draft','submitted','under-review','revision-requested','accepted','published','rejected'] as const;
 const MS_STATUS_COLORS: Record<string, string> = {
@@ -37,7 +38,16 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const currentUserId = useAuthStore((state) => state.user?._id);
 
-  const [activeTab, setActiveTab] = useState<'users' | 'manuscripts'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'manuscripts' | 'classifications'>('users');
+
+  // ── Classifications tab state ──
+  type ClassItem = { value: string; label: string };
+  const [disciplines, setDisciplines] = useState<ClassItem[]>([]);
+  const [methodologies, setMethodologies] = useState<ClassItem[]>([]);
+  const [classLoading, setClassLoading] = useState(false);
+  const [classSaving, setClassSaving] = useState<'disciplines' | 'methodologies' | null>(null);
+  const [newDiscipline, setNewDiscipline] = useState({ value: '', label: '' });
+  const [newMethodology, setNewMethodology] = useState({ value: '', label: '' });
 
   // ── Users tab state ──
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -122,6 +132,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (activeTab === 'manuscripts') loadManuscripts(1);
+    if (activeTab === 'classifications') loadClassifications();
   }, [activeTab, msStatus]);
 
   const handleSelectMs = (ms: any) => {
@@ -159,6 +170,54 @@ export default function AdminPage() {
   };
 
   const msTotalPages = Math.max(1, Math.ceil(msTotal / MS_LIMIT));
+
+  // ── Classification tab logic ──
+  const loadClassifications = useCallback(async () => {
+    setClassLoading(true);
+    try {
+      const { data } = await apiClient.get('/config/classifications');
+      setDisciplines(data.disciplines || []);
+      setMethodologies(data.methodologies || []);
+    } catch {
+      toast.error('Failed to load classifications');
+    } finally {
+      setClassLoading(false);
+    }
+  }, []);
+
+  const handleSaveClassification = async (type: 'disciplines' | 'methodologies', items: ClassItem[]) => {
+    setClassSaving(type);
+    try {
+      await apiClient.put(`/config/${type}`, { items });
+      if (type === 'disciplines') setDisciplines(items);
+      else setMethodologies(items);
+      invalidateClassificationsCache();
+      toast.success(`${type === 'disciplines' ? 'Disciplines' : 'Methodologies'} saved`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Failed to save');
+    } finally {
+      setClassSaving(null);
+    }
+  };
+
+  const removeItem = (type: 'disciplines' | 'methodologies', value: string) => {
+    const items = type === 'disciplines' ? disciplines : methodologies;
+    const next = items.filter(i => i.value !== value);
+    handleSaveClassification(type, next);
+  };
+
+  const addItem = (type: 'disciplines' | 'methodologies') => {
+    const draft = type === 'disciplines' ? newDiscipline : newMethodology;
+    if (!draft.label.trim()) { toast.error('Label is required'); return; }
+    const slugValue = draft.value.trim() || draft.label.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const items = type === 'disciplines' ? disciplines : methodologies;
+    if (items.some(i => i.value === slugValue)) { toast.error('That value already exists'); return; }
+    const next = [...items, { value: slugValue, label: draft.label.trim() }];
+    handleSaveClassification(type, next).then(() => {
+      if (type === 'disciplines') setNewDiscipline({ value: '', label: '' });
+      else setNewMethodology({ value: '', label: '' });
+    });
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -275,7 +334,7 @@ export default function AdminPage() {
         {/* Tabs */}
         <div className="mt-6 border-b border-gray-200">
           <nav className="flex gap-6">
-            {(['users', 'manuscripts'] as const).map(tab => (
+            {(['users', 'manuscripts', 'classifications'] as const).map(tab => (
               <button
                 key={tab}
                 type="button"
@@ -286,7 +345,7 @@ export default function AdminPage() {
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {tab === 'users' ? 'Users & Roles' : 'Manuscripts'}
+                {tab === 'users' ? 'Users & Roles' : tab === 'manuscripts' ? 'Manuscripts' : 'Classifications'}
               </button>
             ))}
           </nav>
@@ -799,6 +858,118 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
+        {/* ── Classifications tab ────────────────────────────────── */}
+        {activeTab === 'classifications' && (
+          <div className="mt-6 space-y-8">
+            {classLoading ? (
+              <p className="text-sm text-gray-500">Loading…</p>
+            ) : (
+              <>
+                {/* Disciplines */}
+                <ClassificationSection
+                  title="Disciplines"
+                  description="Shown to authors as the research field / subject area."
+                  items={disciplines}
+                  newItem={newDiscipline}
+                  setNewItem={setNewDiscipline}
+                  onAdd={() => addItem('disciplines')}
+                  onRemove={(v) => removeItem('disciplines', v)}
+                  saving={classSaving === 'disciplines'}
+                />
+
+                {/* Methodologies / Article Types */}
+                <ClassificationSection
+                  title="Methodologies / Article Types"
+                  description="Shown to authors as the study design or article type."
+                  items={methodologies}
+                  newItem={newMethodology}
+                  setNewItem={setNewMethodology}
+                  onAdd={() => addItem('methodologies')}
+                  onRemove={(v) => removeItem('methodologies', v)}
+                  saving={classSaving === 'methodologies'}
+                />
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Reusable section component ─────────────────────────────────────────────
+function ClassificationSection({
+  title, description, items, newItem, setNewItem, onAdd, onRemove, saving,
+}: {
+  title: string;
+  description: string;
+  items: { value: string; label: string }[];
+  newItem: { value: string; label: string };
+  setNewItem: (v: { value: string; label: string }) => void;
+  onAdd: () => void;
+  onRemove: (value: string) => void;
+  saving: boolean;
+}) {
+  return (
+    <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100">
+        <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+        <p className="text-xs text-gray-500 mt-0.5">{description}</p>
+      </div>
+
+      {/* Existing items */}
+      <div className="divide-y divide-gray-50">
+        {items.length === 0 && (
+          <p className="px-6 py-4 text-sm text-gray-400 italic">No items. Add one below.</p>
+        )}
+        {items.map((item) => (
+          <div key={item.value} className="flex items-center justify-between px-6 py-3">
+            <div>
+              <span className="text-sm font-medium text-gray-800">{item.label}</span>
+              <span className="ml-2 text-xs text-gray-400 font-mono">{item.value}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onRemove(item.value)}
+              disabled={saving}
+              className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40 px-2 py-1 rounded hover:bg-red-50"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Add new item */}
+      <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+        <p className="text-xs font-medium text-gray-600 mb-2">Add new item</p>
+        <div className="flex gap-2 flex-wrap">
+          <input
+            type="text"
+            placeholder="Label (e.g. Ethnobotany)"
+            value={newItem.label}
+            onChange={(e) => setNewItem({ ...newItem, label: e.target.value })}
+            className="flex-1 min-w-[160px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), onAdd())}
+          />
+          <input
+            type="text"
+            placeholder="Slug (auto if blank)"
+            value={newItem.value}
+            onChange={(e) => setNewItem({ ...newItem, value: e.target.value })}
+            className="w-44 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500"
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), onAdd())}
+          />
+          <button
+            type="button"
+            onClick={onAdd}
+            disabled={saving || !newItem.label.trim()}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-40"
+          >
+            {saving ? 'Saving…' : '+ Add'}
+          </button>
+        </div>
       </div>
     </div>
   );

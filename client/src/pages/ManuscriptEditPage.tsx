@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import apiClient from '../api/client';
 import { useAuthStore } from '../utils/authStore';
 import { ManuscriptExporter } from '../utils/manuscriptExporter';
-import { DISCIPLINES, METHODOLOGIES } from '../constants/manuscriptOptions';
+import { useClassifications } from '../hooks/useClassifications';
 import manuscriptTemplateFile from '../assets/Template.docx?url';
 
 type AuthorInput = { name: string; email: string; affiliation: string };
@@ -15,6 +15,7 @@ export default function ManuscriptEditPage() {
   const { manuscriptId } = useParams();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const { disciplines, methodologies } = useClassifications();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -22,12 +23,10 @@ export default function ManuscriptEditPage() {
   const [manuscript, setManuscript] = useState<any>(null);
   const [title, setTitle] = useState('');
   const [abstract, setAbstract] = useState('');
-  const [journalId, setJournalId] = useState('');
   const [discipline, setDiscipline] = useState('');
   const [methodology, setMethodology] = useState('');
   const [keywordsText, setKeywordsText] = useState('');
   const [authors, setAuthors] = useState<AuthorInput[]>([{ ...EMPTY_AUTHOR }]);
-  const [journals, setJournals] = useState<any[]>([]);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
 
   useEffect(() => {
@@ -38,21 +37,16 @@ export default function ManuscriptEditPage() {
 
     const load = async () => {
       try {
-        const [manuscriptResponse, journalResponse] = await Promise.all([
-          apiClient.get(`/manuscripts/${manuscriptId}`),
-          apiClient.get('/journals/search', { params: { q: '', page: 1, limit: 100, isOpen: true } }),
-        ]);
+        const manuscriptResponse = await apiClient.get(`/manuscripts/${manuscriptId}`);
 
         const nextManuscript = manuscriptResponse.data;
         setManuscript(nextManuscript);
         setTitle(nextManuscript.title || '');
         setAbstract(nextManuscript.abstract || '');
-        setJournalId(nextManuscript.journalId?._id || nextManuscript.journalId || '');
         setDiscipline(nextManuscript.discipline || '');
         setMethodology(nextManuscript.methodology || '');
         setKeywordsText(Array.isArray(nextManuscript.keywords) ? nextManuscript.keywords.join(', ') : nextManuscript.keywords || '');
         setAuthors(Array.isArray(nextManuscript.authors) && nextManuscript.authors.length > 0 ? nextManuscript.authors : [{ ...EMPTY_AUTHOR }]);
-        setJournals(journalResponse.data?.journals || []);
       } catch (error: any) {
         toast.error(error?.response?.data?.error || 'Failed to load manuscript');
         navigate('/dashboard');
@@ -140,7 +134,6 @@ export default function ManuscriptEditPage() {
         keywords: keywordsText.split(',').map((keyword) => keyword.trim()).filter(Boolean),
         discipline,
         methodology,
-        journalId: journalId || undefined,
         authors: normalizedAuthors.length > 0 ? normalizedAuthors : [{ name: 'Anonymous', email: '', affiliation: '' }],
       });
       await refreshManuscript();
@@ -155,10 +148,6 @@ export default function ManuscriptEditPage() {
   };
 
   const handleSubmit = async () => {
-    if (!journalId) {
-      toast.error('Select a journal before submitting');
-      return;
-    }
     if (!abstract.trim()) {
       toast.error('Abstract is required');
       return;
@@ -315,28 +304,19 @@ export default function ManuscriptEditPage() {
               <textarea value={abstract} onChange={(event) => setAbstract(event.target.value)} rows={5} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Target Journal</label>
-              <select value={journalId} onChange={(event) => setJournalId(event.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                <option value="">Select journal</option>
-                {journals.map((journal) => (
-                  <option key={journal._id} value={journal._id}>{journal.title}</option>
-                ))}
-              </select>
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Discipline</label>
               <select value={discipline} onChange={(event) => setDiscipline(event.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
                 <option value="">Select discipline</option>
-                {DISCIPLINES.map((disciplineOption) => (
+                {disciplines.map((disciplineOption) => (
                   <option key={disciplineOption.value} value={disciplineOption.value}>{disciplineOption.label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Methodology</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Methodology / Article Type</label>
               <select value={methodology} onChange={(event) => setMethodology(event.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg">
                 <option value="">Select methodology</option>
-                {METHODOLOGIES.map((methodologyOption) => (
+                {methodologies.map((methodologyOption) => (
                   <option key={methodologyOption.value} value={methodologyOption.value}>{methodologyOption.label}</option>
                 ))}
               </select>

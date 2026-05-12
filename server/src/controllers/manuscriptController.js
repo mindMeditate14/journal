@@ -802,13 +802,21 @@ export async function submitManuscript(req, res, next) {
       return res.status(400).json({ error: validationError });
     }
 
-    // Verify journal exists
-    const journal = await Journal.findById(finalPayload.journalId);
-    if (!journal) {
-      return res.status(404).json({ error: 'Journal not found' });
+    // Verify journal — if author didn't pick one, auto-assign the first open journal
+    let journal;
+    if (finalPayload.journalId) {
+      journal = await Journal.findById(finalPayload.journalId);
+      if (!journal) {
+        return res.status(404).json({ error: 'Journal not found' });
+      }
+    } else {
+      journal = await Journal.findOne({ isOpen: true }).sort({ createdAt: 1 });
+      if (!journal) {
+        return res.status(400).json({ error: 'No journal is currently open for submissions' });
+      }
+      finalPayload.journalId = journal._id;
     }
 
-    // Check if journal is open for submissions
     if (!journal.isOpen) {
       return res.status(400).json({ error: 'This journal is not accepting submissions' });
     }

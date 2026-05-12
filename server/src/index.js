@@ -21,6 +21,7 @@ import paperRoutes from './routes/papers.js';
 import ingestRoutes from './routes/ingest.js';
 import adminRoutes from './routes/admin.js';
 import practiceDataRoutes from './routes/practiceData.js';
+import configRoutes from './routes/config.js';
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use('/api/workspace', workspaceRoutes);
 app.use('/api/papers', paperRoutes);
 app.use('/api/ingest', ingestRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/config', configRoutes);
 app.use('/api/practice-data', practiceDataRoutes);
 
 // Error handlers
