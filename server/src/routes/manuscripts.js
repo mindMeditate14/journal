@@ -26,6 +26,7 @@ import {
   publishManuscript,
   uploadFinalDocument,
   uploadWorkingDocument,
+  promoteWorkingToFinal,
 } from '../controllers/manuscriptController.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 
@@ -80,6 +81,7 @@ router.delete('/:id', authMiddleware, deleteManuscript);
 router.patch('/:id', authMiddleware, updateManuscript);
 router.get('/:id/extraction-report', authMiddleware, getExtractionReport);
 router.post('/:id/final-document', authMiddleware, uploadDocument.single('document'), uploadFinalDocument);
+router.post('/:id/promote-to-final', authMiddleware, requireRole(['editor', 'admin']), promoteWorkingToFinal);
 router.post('/:id/working-document', authMiddleware, uploadDocument.single('document'), uploadWorkingDocument);
 
 // Reviewer routes

@@ -603,31 +603,9 @@ export default function DashboardPage() {
                   )}
 
                   {m.status === 'accepted' && (
-                    <div className="mt-3 border border-gray-200 rounded-lg p-3 bg-gray-50">
-                      <p className="text-sm text-gray-700 mb-2">
-                        Upload final PDF for searchable publication.
-                      </p>
-                      <div className="flex flex-col md:flex-row md:items-center gap-2">
-                        <input
-                          type="file"
-                          accept="application/pdf"
-                          onChange={(e) =>
-                            setSelectedDocs((prev) => ({
-                              ...prev,
-                              [m._id]: e.target.files?.[0] || null,
-                            }))
-                          }
-                          className="text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleFinalDocumentUpload(m._id)}
-                          disabled={uploadingDocFor === m._id}
-                          className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
-                        >
-                          {uploadingDocFor === m._id ? 'Uploading...' : 'Upload Final Document'}
-                        </button>
-                      </div>
+                    <div className="mt-3 border border-green-200 rounded-lg p-3 bg-green-50">
+                      <p className="text-sm text-green-800 font-medium">🎉 Congratulations — your manuscript has been accepted!</p>
+                      <p className="text-sm text-green-700 mt-1">The editorial office will prepare the final version for publication. You will be notified once it is published and a DOI is assigned.</p>
                     </div>
                   )}
                 </div>

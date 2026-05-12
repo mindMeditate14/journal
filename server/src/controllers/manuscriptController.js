@@ -1396,6 +1396,36 @@ export async function makeEditorDecision(req, res, next) {
 }
 
 /**
+ * Editor: Promote working document to final document (no re-upload needed)
+ * POST /api/manuscripts/:id/promote-to-final
+ */
+export async function promoteWorkingToFinal(req, res, next) {
+  try {
+    const manuscript = await Manuscript.findById(req.params.id);
+    if (!manuscript) return res.status(404).json({ error: 'Manuscript not found' });
+
+    if (!manuscript.workingDocument?.url) {
+      return res.status(400).json({ error: 'No working document exists to promote.' });
+    }
+    if (manuscript.workingDocument.mimeType !== 'application/pdf') {
+      return res.status(400).json({ error: 'Working document must be a PDF to promote as final. Upload a PDF working document first.' });
+    }
+    if (!['accepted', 'published'].includes(manuscript.status)) {
+      return res.status(400).json({ error: 'Manuscript must be accepted before setting a final document.' });
+    }
+
+    manuscript.finalDocument = { ...manuscript.workingDocument };
+    manuscript.lastEditedBy = req.user._id;
+    manuscript.updatedAt = new Date();
+    await manuscript.save();
+
+    res.json({ success: true, finalDocument: manuscript.finalDocument });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * Editor: Publish manuscript with DOI
  * POST /api/manuscripts/:id/publish
  */

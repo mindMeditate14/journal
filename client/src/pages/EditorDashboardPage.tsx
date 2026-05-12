@@ -42,6 +42,7 @@ export function EditorDashboardPage() {
   const [uploadingWorkingDoc, setUploadingWorkingDoc] = useState(false);
   const [selectedFinalDoc, setSelectedFinalDoc] = useState<File | null>(null);
   const [uploadingFinalDoc, setUploadingFinalDoc] = useState(false);
+  const [promotingToFinal, setPromotingToFinal] = useState(false);
 
   useEffect(() => {
     fetchSubmissions();
@@ -146,6 +147,21 @@ export function EditorDashboardPage() {
       setSelectedManuscript(null);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to publish');
+    }
+  };
+
+  const handlePromoteToFinal = async () => {
+    if (!selectedManuscript?._id) return;
+    try {
+      setPromotingToFinal(true);
+      await apiClient.post(`/manuscripts/${selectedManuscript._id}/promote-to-final`);
+      toast.success('Working document promoted to final PDF');
+      await handleSelectManuscript(selectedManuscript._id);
+      await fetchSubmissions();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to promote document');
+    } finally {
+      setPromotingToFinal(false);
     }
   };
 
@@ -586,29 +602,61 @@ export function EditorDashboardPage() {
                   {!selectedManuscript.finalDocument?.url ? (
                     <>
                       <p className="text-gray-700 mb-3">
-                        Final PDF is required before publishing this paper to search.
+                        A final PDF is required before publishing. Choose one of the options below:
                       </p>
-                      <div className="flex flex-col md:flex-row gap-2 mb-4">
-                        <input
-                          type="file"
-                          accept="application/pdf"
-                          onChange={(e) => setSelectedFinalDoc(e.target.files?.[0] || null)}
-                          className="text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleUploadFinalDocument}
-                          disabled={uploadingFinalDoc}
-                          className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                        >
-                          {uploadingFinalDoc ? 'Uploading...' : 'Upload Final Document'}
-                        </button>
+
+                      {/* Option 1: promote working doc if it's already a PDF */}
+                      {selectedManuscript.workingDocument?.url && selectedManuscript.workingDocument?.mimeType === 'application/pdf' && (
+                        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                          <p className="text-sm text-emerald-800 font-medium mb-2">
+                            ✅ The working document is already a PDF — use it as the final version:
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handlePromoteToFinal}
+                            disabled={promotingToFinal}
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium"
+                          >
+                            {promotingToFinal ? 'Promoting...' : '⚡ Use Working Document as Final PDF'}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Option 2: upload a separate (typeset/formatted) final PDF */}
+                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                        <p className="text-sm text-gray-600 mb-2">
+                          Or upload a typeset / formatted final PDF:
+                        </p>
+                        <div className="flex flex-col md:flex-row gap-2">
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            onChange={(e) => setSelectedFinalDoc(e.target.files?.[0] || null)}
+                            className="text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleUploadFinalDocument}
+                            disabled={uploadingFinalDoc}
+                            className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
+                          >
+                            {uploadingFinalDoc ? 'Uploading...' : 'Upload Final PDF'}
+                          </button>
+                        </div>
                       </div>
                     </>
                   ) : (
-                    <p className="text-gray-700 mb-4">
-                      Final document ready. You can publish this accepted paper to search now.
-                    </p>
+                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between gap-3">
+                      <p className="text-green-800 text-sm font-medium">✅ Final PDF ready</p>
+                      <a
+                        href={selectedManuscript.finalDocument.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-indigo-600 underline text-sm"
+                      >
+                        Preview
+                      </a>
+                    </div>
                   )}
                   <button
                     onClick={handlePublish}

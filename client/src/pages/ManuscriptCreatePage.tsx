@@ -316,7 +316,7 @@ export default function ManuscriptCreatePage() {
                   className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                 />
                 {documentFile ? <p className="mt-3 text-sm text-indigo-700">Selected: {documentFile.name}</p> : null}
-                <p className="text-xs text-gray-500 mt-2">Upload a PDF, DOC, or DOCX file to preserve the full manuscript document.</p>
+                <p className="text-xs text-gray-500 mt-2">Upload PDF or Word (.docx) — reviewers will annotate this file. A final PDF will be requested after acceptance.</p>
               </div>
             </div>
 
