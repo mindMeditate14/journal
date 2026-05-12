@@ -1347,7 +1347,7 @@ export async function makeEditorDecision(req, res, next) {
       return res.status(400).json({ error: 'Invalid decision' });
     }
 
-    const manuscript = await Manuscript.findById(id);
+    const manuscript = await Manuscript.findById(id).populate('submittedBy', 'name email');
     if (!manuscript) {
       return res.status(404).json({ error: 'Manuscript not found' });
     }

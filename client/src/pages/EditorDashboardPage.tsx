@@ -17,6 +17,38 @@ const formatDecisionLabel = (value?: string) => {
   return String(value).replace(/-/g, ' ');
 };
 
+/** Returns a tag describing WHO needs to act next — the key info for an editor. */
+function getActionTag(m: any): { label: string; className: string } {
+  const reviews: any[] = m.reviews || [];
+  const submittedCount = reviews.filter((r: any) => r.submittedAt).length;
+  const totalReviewers = reviews.length;
+  const allReviewsDone = totalReviewers > 0 && submittedCount === totalReviewers;
+
+  switch (m.status) {
+    case 'submitted':
+      return { label: '⚡ Assign Reviewers', className: 'bg-red-100 text-red-700 border border-red-200' };
+    case 'under-review':
+      if (allReviewsDone)
+        return { label: '⚡ Decision Required', className: 'bg-orange-100 text-orange-700 border border-orange-200' };
+      return {
+        label: `⏳ Reviewers (${submittedCount}/${totalReviewers} done)`,
+        className: 'bg-purple-100 text-purple-700 border border-purple-200',
+      };
+    case 'revision-requested':
+      return { label: '⏳ Awaiting Author', className: 'bg-amber-100 text-amber-700 border border-amber-200' };
+    case 'accepted':
+      return m.finalDocument?.url
+        ? { label: '⚡ Ready to Publish', className: 'bg-green-100 text-green-700 border border-green-200' }
+        : { label: '⚡ Prepare Final PDF', className: 'bg-teal-100 text-teal-700 border border-teal-200' };
+    case 'published':
+      return { label: '✅ Published', className: 'bg-emerald-100 text-emerald-700 border border-emerald-200' };
+    case 'rejected':
+      return { label: 'Rejected', className: 'bg-gray-100 text-gray-500 border border-gray-200' };
+    default:
+      return { label: m.status, className: 'bg-gray-100 text-gray-600' };
+  }
+}
+
 export function EditorDashboardPage() {
   const [submissions, setSubmissions] = useState([]);
   const [reviewerCandidates, setReviewerCandidates] = useState([]);
@@ -254,49 +286,41 @@ export function EditorDashboardPage() {
                     >
                       <p className="font-medium text-gray-900 line-clamp-2 text-sm">{m.title}</p>
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${
-                          m.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
-                          m.status === 'under-review' ? 'bg-purple-100 text-purple-700' :
-                          m.status === 'revision-requested' ? 'bg-amber-100 text-amber-700' :
-                          m.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                          m.status === 'published' ? 'bg-emerald-100 text-emerald-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {String(m.status).replace(/-/g, ' ')}
-                        </span>
+                        {(() => {
+                          const tag = getActionTag(m);
+                          return (
+                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${tag.className}`}>
+                              {tag.label}
+                            </span>
+                          );
+                        })()}
+                        {m.revisionRound > 0 && (
+                          <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">
+                            Round {m.revisionRound + 1}
+                          </span>
+                        )}
                       </div>
                       {m.authors?.[0]?.name && (
                         <p className="text-xs text-gray-500 mt-1">By: {m.authors[0].name}</p>
                       )}
                       {(() => {
-                        const reviews = m.reviews || [];
+                        const reviews: any[] = m.reviews || [];
                         const isFinished = ['accepted', 'published', 'rejected'].includes(m.status);
                         if (isFinished || reviews.length === 0) return null;
                         const reviewerNames = reviews
                           .map((r: any) => r.reviewerId?.name || r.reviewerName)
                           .filter(Boolean);
-                        const submitted = reviews.filter((r: any) => r.submittedAt).length;
-                        const total = reviews.length;
-                        if (reviewerNames.length > 0) {
-                          return (
-                            <p className="text-xs text-teal-600 mt-0.5">
-                              Reviewers: {reviewerNames.join(', ')}{submitted > 0 ? ` (${submitted}/${total} done)` : ''}
-                            </p>
-                          );
-                        }
-                        return submitted === total && total > 0 ? (
-                          <p className="text-xs text-green-600 mt-0.5">{total} review{total > 1 ? 's' : ''} submitted</p>
-                        ) : (
-                          <p className="text-xs text-amber-600 mt-0.5">{submitted}/{total} reviews submitted</p>
+                        if (reviewerNames.length === 0) return null;
+                        return (
+                          <p className="text-xs text-gray-400 mt-0.5 truncate">
+                            {reviewerNames.join(' · ')}
+                          </p>
                         );
                       })()}
                       {m.submittedAt && (
                         <p className="text-xs text-gray-400 mt-0.5">
-                          Submitted: {new Date(m.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {new Date(m.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </p>
-                      )}
-                      {m.discipline && (
-                        <p className="text-xs text-gray-400 mt-0.5">{m.discipline}</p>
                       )}
                     </button>
                   ))
@@ -332,9 +356,21 @@ export function EditorDashboardPage() {
 
                   <div>
                     <p className="text-sm text-gray-600">Status</p>
-                    <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
-                      {selectedManuscript.status}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap mt-1">
+                      {(() => {
+                        const tag = getActionTag(selectedManuscript);
+                        return (
+                          <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${tag.className}`}>
+                            {tag.label}
+                          </span>
+                        );
+                      })()}
+                      {selectedManuscript.revisionRound > 0 && (
+                        <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                          Round {selectedManuscript.revisionRound + 1}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div>
