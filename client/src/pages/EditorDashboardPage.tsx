@@ -35,7 +35,7 @@ export function EditorDashboardPage() {
     editorNotes: '',
   });
 
-  const [reviewerForm, setReviewerForm] = useState({
+  const [reviewerForm, setReviewerForm] = useState<{ reviewerIds: string[] }>({
     reviewerIds: [],
   });
   const [selectedWorkingDoc, setSelectedWorkingDoc] = useState<File | null>(null);
@@ -440,46 +440,60 @@ export function EditorDashboardPage() {
                 <div className="bg-white rounded-lg shadow p-6">
                   <h3 className="text-lg font-semibold mb-1">Assign or Re-assign Reviewers</h3>
                   <p className="text-sm text-gray-500 mb-4">
-                    Select users below and click <strong>Assign Reviewers</strong>. Then share the review link with them:<br/>
-                    <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded select-all">
-                      {window.location.origin}/peer-review/{selectedManuscript._id}
-                    </span>
+                    Tick one or more reviewers below, then click <strong>Assign Reviewers</strong>. Each reviewer will receive an email invitation with a direct link.
                   </p>
 
                   <form onSubmit={handleAssignReviewers} className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Select Reviewers
+                        {reviewerForm.reviewerIds.length > 0 && (
+                          <span className="ml-2 text-indigo-600 font-semibold">{reviewerForm.reviewerIds.length} selected</span>
+                        )}
                       </label>
-                      <select
-                        multiple
-                        value={reviewerForm.reviewerIds}
-                        onChange={e =>
-                          setReviewerForm({
-                            reviewerIds: Array.from(
-                              e.target.selectedOptions,
-                              option => option.value
-                            ),
-                          })
-                        }
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      >
-                        {reviewerCandidates.map((candidate) => (
-                          <option key={candidate._id} value={candidate._id}>
-                            {candidate.name} ({candidate.email})
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Hold Ctrl/Cmd to select multiple{reviewerCandidates.length === 0 ? ' (no reviewer accounts found)' : ''}
-                      </p>
+                      {reviewerCandidates.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic">No reviewer accounts found. Assign users the reviewer role in Admin first.</p>
+                      ) : (
+                        <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                          {reviewerCandidates.map((candidate: any) => {
+                            const checked = reviewerForm.reviewerIds.includes(candidate._id);
+                            return (
+                              <label
+                                key={candidate._id}
+                                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 ${checked ? 'bg-indigo-50' : ''}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() =>
+                                    setReviewerForm(prev => ({
+                                      reviewerIds: checked
+                                        ? prev.reviewerIds.filter((id: string) => id !== candidate._id)
+                                        : [...prev.reviewerIds, candidate._id],
+                                    }))
+                                  }
+                                  className="w-4 h-4 text-indigo-600 rounded border-gray-300"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 truncate">{candidate.name}</p>
+                                  <p className="text-xs text-gray-500 truncate">{candidate.email}</p>
+                                </div>
+                                {candidate.affiliation && (
+                                  <span className="text-xs text-gray-400 hidden md:block truncate max-w-[140px]">{candidate.affiliation}</span>
+                                )}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium"
+                      disabled={reviewerForm.reviewerIds.length === 0}
+                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Assign Reviewers
+                      Assign {reviewerForm.reviewerIds.length > 1 ? `${reviewerForm.reviewerIds.length} Reviewers` : 'Reviewer'}
                     </button>
                   </form>
                 </div>

@@ -375,28 +375,30 @@ export async function uploadWorkingDocument(req, res, next) {
 
     manuscript.workingDocument = await buildStoredDocumentPayload(req.file, req.user._id);
 
-    // Author revision upload should move manuscript back into editor queue.
-    if (isOwner && ['rejected', 'revision-requested'].includes(manuscript.status)) {
-      manuscript.status = 'submitted';
-      manuscript.submittedAt = new Date();
-      manuscript.editorDecision = undefined;
-      manuscript.editorNotes = '';
-
-      // Re-open reviewer slots for the new revision round.
-      if (Array.isArray(manuscript.reviews) && manuscript.reviews.length > 0) {
-        manuscript.reviews = manuscript.reviews.map((review) => ({
-          ...review.toObject(),
-          score: null,
-          recommendation: null,
-          feedback: '',
-          submittedAt: null,
-        }));
+    // Author revision upload: restore to review queue.
+    const wasRevision = isOwner && manuscript.status === 'revision-requested';
+    if (wasRevision) {
+      const hasReviewers = Array.isArray(manuscript.reviews) && manuscript.reviews.length > 0;
+      if (hasReviewers) {
+        archiveAndResetReviews(manuscript);
+        // status = 'under-review' set by helper
+      } else {
+        manuscript.status = 'submitted';
+        manuscript.editorDecision = undefined;
+        manuscript.editorNotes = '';
       }
+      manuscript.submittedAt = new Date();
     }
 
     manuscript.lastEditedBy = req.user._id;
     manuscript.updatedAt = new Date();
     await manuscript.save();
+
+    if (wasRevision && Array.isArray(manuscript.reviews) && manuscript.reviews.length > 0) {
+      sendRevisionNotificationToReviewers(manuscript).catch(err => {
+        logger.warn(`Failed to send revision notification to reviewers: ${err.message}`);
+      });
+    }
 
     res.json({
       success: true,
@@ -764,6 +766,7 @@ export async function submitManuscript(req, res, next) {
       dataAvailability: dataAvailability || '',
     };
 
+    let wasRevision = false;
     if (draftId) {
       manuscript = await Manuscript.findById(draftId);
       if (!manuscript) {
@@ -773,6 +776,8 @@ export async function submitManuscript(req, res, next) {
       if (manuscript.submittedBy.toString() !== req.user._id.toString()) {
         return res.status(403).json({ error: 'Unauthorized' });
       }
+
+      wasRevision = manuscript.status === 'revision-requested';
 
       finalPayload = {
         journalId: journalId || manuscript.journalId,
@@ -821,25 +826,40 @@ export async function submitManuscript(req, res, next) {
     manuscript.title = manuscript.title.trim();
     manuscript.abstract = manuscript.abstract.trim();
     manuscript.body = manuscript.body.trim();
-    manuscript.status = 'submitted';
     manuscript.submittedAt = new Date();
     manuscript.validationState = 'ready_for_submission';
     manuscript.completenessScore = Math.max(90, manuscript.completenessScore || 0);
     manuscript.lastEditedBy = req.user._id;
     manuscript.updatedAt = new Date();
 
+    // If this is a revision resubmission with assigned reviewers, go straight back to under-review.
+    const isRevisionResubmit = !!draftId && wasRevision;
+    const hasReviewers = Array.isArray(manuscript.reviews) && manuscript.reviews.length > 0;
+    if (isRevisionResubmit && hasReviewers) {
+      archiveAndResetReviews(manuscript);
+      // status = 'under-review' set by helper
+    } else {
+      manuscript.status = 'submitted';
+    }
+
     await manuscript.save();
 
-    // Send confirmation email to author
-    try {
-      await sendSubmissionConfirmationEmail(
-        req.user.email,
-        manuscript.authors[0].name,
-        manuscript.submissionId,
-        manuscript.title
-      );
-    } catch (emailErr) {
-      logger.warn(`Failed to send submission confirmation email: ${emailErr.message}`);
+    if (isRevisionResubmit && hasReviewers) {
+      sendRevisionNotificationToReviewers(manuscript).catch(err => {
+        logger.warn(`Failed to send revision notification to reviewers: ${err.message}`);
+      });
+    } else {
+      // Send confirmation email to author
+      try {
+        await sendSubmissionConfirmationEmail(
+          req.user.email,
+          manuscript.authors[0].name,
+          manuscript.submissionId,
+          manuscript.title
+        );
+      } catch (emailErr) {
+        logger.warn(`Failed to send submission confirmation email: ${emailErr.message}`);
+      }
     }
 
     res.status(201).json({
@@ -1287,6 +1307,15 @@ export async function submitPeerReview(req, res, next) {
 
     await manuscript.save();
 
+    // Check if all reviewers have now submitted and all recommend acceptance → ping editor
+    const allSubmitted = manuscript.reviews.every(r => r.submittedAt);
+    const allAccept = manuscript.reviews.every(r => r.recommendation === 'accept');
+    if (allSubmitted && allAccept && manuscript.assignedEditor) {
+      notifyEditorAllApproved(manuscript).catch(err => {
+        logger.warn(`Failed to notify editor of all-approve: ${err.message}`);
+      });
+    }
+
     res.json({
       success: true,
       message: 'Review submitted successfully',
@@ -1515,6 +1544,45 @@ function canPublish(manuscript) {
 }
 
 /**
+ * Archive the current review round into reviewHistory and reset reviewer slots.
+ * Sets manuscript.status = 'under-review' and clears editorDecision/Notes.
+ * Call this BEFORE saving the manuscript.
+ */
+function archiveAndResetReviews(manuscript) {
+  if (!manuscript.reviewHistory) manuscript.reviewHistory = [];
+
+  const submittedReviews = (manuscript.reviews || []).filter(r => r.submittedAt);
+  if (submittedReviews.length > 0) {
+    manuscript.reviewHistory.push({
+      round: manuscript.revisionRound || 0,
+      editorDecision: manuscript.editorDecision,
+      editorNotes: manuscript.editorNotes,
+      archivedAt: new Date(),
+      reviews: submittedReviews.map(r => ({
+        reviewerId: r.reviewerId,
+        score: r.score,
+        recommendation: r.recommendation,
+        feedback: r.feedback,
+        submittedAt: r.submittedAt,
+      })),
+    });
+  }
+
+  // Reset reviewer slots — keep the IDs so same people review again
+  manuscript.reviews = (manuscript.reviews || []).map(r => ({
+    ...(r.toObject ? r.toObject() : r),
+    score: null,
+    recommendation: null,
+    feedback: '',
+    submittedAt: null,
+  }));
+
+  manuscript.editorDecision = undefined;
+  manuscript.editorNotes = '';
+  manuscript.status = 'under-review';
+}
+
+/**
  * Send submission confirmation email
  */
 async function sendSubmissionConfirmationEmail(email, authorName, submissionId, title) {
@@ -1542,20 +1610,83 @@ async function sendSubmissionConfirmationEmail(email, authorName, submissionId, 
  */
 async function sendReviewerInvitations(manuscript, reviewerIds) {
   const emailService = (await import('../utils/emailService.js')).default;
+  const reviewers = await User.find({ _id: { $in: reviewerIds } })
+    .select('email profile.firstName profile.lastName')
+    .lean();
 
-  const htmlContent = `
-    <h2>Review Invitation</h2>
-    <p>We invite you to review the following manuscript:</p>
-    <p><strong>Title:</strong> ${manuscript.title}</p>
-    <p><strong>Authors:</strong> ${manuscript.authors.map(a => a.name).join(', ')}</p>
-    <p><strong>Abstract:</strong><br/>${manuscript.abstract}</p>
-    <p>Please review this manuscript and provide your feedback within 30 days.</p>
-    <p>Thank you for supporting open science!</p>
-  `;
+  for (const reviewer of reviewers) {
+    const name = `${reviewer.profile?.firstName || ''} ${reviewer.profile?.lastName || ''}`.trim() || reviewer.email;
+    await emailService.send({
+      to: reviewer.email,
+      subject: `Review Invitation: ${manuscript.submissionId}`,
+      html: `
+        <h2>Peer Review Invitation</h2>
+        <p>Dear ${name},</p>
+        <p>You have been invited to review the following manuscript for TradMed International:</p>
+        <p><strong>Title:</strong> ${manuscript.title}</p>
+        <p><strong>Authors:</strong> ${manuscript.authors.map(a => a.name).join(', ')}</p>
+        <p><strong>Abstract:</strong><br/>${manuscript.abstract.substring(0, 400)}...</p>
+        <p>Please <a href="https://journal.mind-meditate.com/peer-review/${manuscript._id}">log in to submit your review</a> within 30 days.</p>
+        <p>Thank you for supporting open science!</p>
+      `,
+    });
+  }
+  logger.info(`Reviewer invitations sent for ${manuscript.submissionId} to ${reviewers.length} reviewer(s)`);
+}
 
-  // Note: This would need reviewer emails from the database
-  // For now, just log that invitations should be sent
-  logger.info(`Reviewer invitations ready to send for ${manuscript.title}`);
+/**
+ * Notify reviewers that a revised manuscript is ready for their 2nd pass
+ */
+async function sendRevisionNotificationToReviewers(manuscript) {
+  const emailService = (await import('../utils/emailService.js')).default;
+  const reviewerIds = (manuscript.reviews || []).map(r => r.reviewerId).filter(Boolean);
+  if (reviewerIds.length === 0) return;
+
+  const reviewers = await User.find({ _id: { $in: reviewerIds } })
+    .select('email profile.firstName profile.lastName')
+    .lean();
+
+  for (const reviewer of reviewers) {
+    const name = `${reviewer.profile?.firstName || ''} ${reviewer.profile?.lastName || ''}`.trim() || reviewer.email;
+    await emailService.send({
+      to: reviewer.email,
+      subject: `Revised Manuscript Ready for Review: ${manuscript.submissionId}`,
+      html: `
+        <h2>Revised Manuscript Submitted</h2>
+        <p>Dear ${name},</p>
+        <p>The author has submitted a revised version of the manuscript you previously reviewed:</p>
+        <p><strong>Title:</strong> ${manuscript.title}</p>
+        <p><strong>Submission ID:</strong> ${manuscript.submissionId}</p>
+        ${manuscript.revisionRound > 0 ? `<p>This is <strong>revision round ${manuscript.revisionRound}</strong>.</p>` : ''}
+        <p>Please <a href="https://journal.mind-meditate.com/peer-review/${manuscript._id}">log in to submit your updated review</a>.</p>
+        <p>Thank you for your continued support!</p>
+      `,
+    });
+  }
+}
+
+/**
+ * Notify the assigned editor that all reviewers recommend acceptance
+ */
+async function notifyEditorAllApproved(manuscript) {
+  const emailService = (await import('../utils/emailService.js')).default;
+  const editor = await User.findById(manuscript.assignedEditor)
+    .select('email profile.firstName profile.lastName')
+    .lean();
+  if (!editor) return;
+
+  const name = `${editor.profile?.firstName || ''} ${editor.profile?.lastName || ''}`.trim() || editor.email;
+  await emailService.send({
+    to: editor.email,
+    subject: `All Reviewers Recommend Acceptance: ${manuscript.submissionId}`,
+    html: `
+      <h2>All Reviewers Recommend Acceptance</h2>
+      <p>Dear ${name},</p>
+      <p>All assigned reviewers have submitted their reviews and unanimously recommend <strong>acceptance</strong> for:</p>
+      <p><strong>"${manuscript.title}"</strong> (${manuscript.submissionId})</p>
+      <p>Please <a href="https://journal.mind-meditate.com/editor">log in to the editor dashboard</a> to review the feedback and make your final editorial decision.</p>
+    `,
+  });
 }
 
 /**
@@ -1571,19 +1702,40 @@ async function sendDecisionEmail(manuscript, decision, notes) {
   else if (decision === 'desk-reject') decisionText = 'DESK REJECTED';
   else if (decision === 'reject') decisionText = 'REJECTED';
 
+  // Build reviewer feedback section (anonymous)
+  const submittedReviews = (manuscript.reviews || []).filter(r => r.submittedAt);
+  const reviewerSection = submittedReviews.length > 0
+    ? `<h3 style="margin-top:24px;">Peer Review Comments</h3>` +
+      submittedReviews.map((r, i) => `
+        <div style="margin-bottom:16px;padding:12px;background:#f9f9f9;border-left:3px solid #6366f1;">
+          <p style="margin:0 0 4px;font-weight:600;">Reviewer ${i + 1}</p>
+          ${r.score != null ? `<p style="margin:0 0 4px;font-size:13px;">Score: ${r.score}/5</p>` : ''}
+          ${r.recommendation ? `<p style="margin:0 0 8px;font-size:13px;">Recommendation: ${String(r.recommendation).replace(/-/g, ' ')}</p>` : ''}
+          ${r.feedback ? `<p style="margin:0;font-size:13px;white-space:pre-line;">${r.feedback}</p>` : ''}
+        </div>`).join('')
+    : '';
+
   const htmlContent = `
-    <h2>Editorial Decision</h2>
+    <h2>Editorial Decision: ${manuscript.submissionId}</h2>
     <p>Dear Author,</p>
-    <p>The editorial decision on your manuscript "${manuscript.title}" is:</p>
-    <p><strong>${decisionText}</strong></p>
-    ${notes ? `<p><strong>Editor Notes:</strong><br/>${notes}</p>` : ''}
-    <p>Please log into your account for more details and to view reviewer feedback.</p>
+    <p>The editorial decision on your manuscript <strong>"${manuscript.title}"</strong> is:</p>
+    <p style="font-size:18px;font-weight:bold;color:${decision === 'accept' ? '#16a34a' : ['minor-revisions','major-revisions'].includes(decision) ? '#d97706' : '#dc2626'}">
+      ${decisionText}
+    </p>
+    ${notes ? `<div style="margin:16px 0;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;"><strong>Editor Notes:</strong><br/>${notes}</div>` : ''}
+    ${reviewerSection}
+    ${['minor-revisions','major-revisions'].includes(decision)
+      ? `<p style="margin-top:20px;">Please log into your account, review all comments above, revise your manuscript, and re-submit. Your submission ID is <strong>${manuscript.submissionId}</strong>.</p>`
+      : decision === 'accept'
+        ? `<p style="margin-top:20px;">Congratulations! The editor will now prepare your manuscript for publication.</p>`
+        : `<p style="margin-top:20px;">Thank you for your submission. You may revise and resubmit to a future issue.</p>`
+    }
   `;
 
   if (manuscript.submittedBy && manuscript.submittedBy.email) {
     await emailService.send({
       to: manuscript.submittedBy.email,
-      subject: `Editorial Decision: ${manuscript.submissionId}`,
+      subject: `Editorial Decision [${decisionText}]: ${manuscript.submissionId}`,
       html: htmlContent,
     });
   }

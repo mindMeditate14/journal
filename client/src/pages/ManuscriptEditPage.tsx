@@ -239,6 +239,71 @@ export default function ManuscriptEditPage() {
           <button onClick={() => navigate('/dashboard')} className="text-gray-600 hover:text-gray-900 text-sm">← Back to Dashboard</button>
         </div>
 
+        {/* Editorial decision + reviewer feedback panel */}
+        {(manuscript?.editorDecision || (Array.isArray(manuscript?.reviews) && manuscript.reviews.some((r: any) => r.submittedAt))) && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 bg-amber-50 border-b border-amber-200">
+              <h2 className="text-base font-semibold text-amber-900">Review Outcome</h2>
+              <p className="text-xs text-amber-700 mt-0.5">Read all reviewer comments carefully before revising your manuscript.</p>
+            </div>
+
+            {manuscript?.editorDecision && (
+              <div className="px-6 py-4 border-b border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Editor Decision</p>
+                <span className={`inline-block text-sm font-semibold px-3 py-1 rounded-full ${
+                  manuscript.editorDecision === 'accept' ? 'bg-green-100 text-green-800' :
+                  ['minor-revisions','major-revisions'].includes(manuscript.editorDecision) ? 'bg-amber-100 text-amber-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {String(manuscript.editorDecision).replace(/-/g, ' ')}
+                </span>
+                {manuscript.editorNotes && (
+                  <p className="mt-2 text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
+                    <span className="font-medium">Editor notes:</span> {manuscript.editorNotes}
+                  </p>
+                )}
+                {manuscript.revisionRound > 1 && (
+                  <p className="text-xs text-gray-500 mt-1">Revision round {manuscript.revisionRound}</p>
+                )}
+              </div>
+            )}
+
+            {Array.isArray(manuscript?.reviews) && manuscript.reviews.some((r: any) => r.submittedAt) && (
+              <div className="divide-y divide-gray-100">
+                {manuscript.reviews.filter((r: any) => r.submittedAt).map((r: any, i: number) => (
+                  <div key={i} className="px-6 py-4">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                      <span className="text-sm font-semibold text-gray-800">Reviewer {i + 1}</span>
+                      {r.score != null && (
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-medium">
+                          Score: {r.score}/5
+                        </span>
+                      )}
+                      {r.recommendation && (
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                          r.recommendation === 'accept' ? 'bg-green-100 text-green-700' :
+                          r.recommendation === 'reject' ? 'bg-red-100 text-red-700' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          {String(r.recommendation).replace(/-/g, ' ')}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-400 ml-auto">
+                        {new Date(r.submittedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {r.feedback && (
+                      <div className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 whitespace-pre-line">
+                        {r.feedback}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow p-6 space-y-6">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="md:col-span-2">

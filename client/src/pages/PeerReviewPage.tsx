@@ -165,6 +165,22 @@ export function PeerReviewPage() {
         >
           ← Back to Dashboard
         </a>
+
+        {/* Revision round banner */}
+        {manuscript.revisionRound > 0 && (
+          <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <span className="text-amber-600 text-xl">🔄</span>
+            <div>
+              <p className="text-sm font-semibold text-amber-800">
+                Revision Round {manuscript.revisionRound}
+              </p>
+              <p className="text-xs text-amber-700">
+                The author has submitted a revised manuscript. Please review the changes and update your assessment.
+              </p>
+            </div>
+          </div>
+        )}
+
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Peer Review Form</h1>
 
         {/* Manuscript Summary */}
@@ -247,6 +263,57 @@ export function PeerReviewPage() {
             </div>
           </div>
         </div>
+
+        {/* Previous round reviews */}
+        {Array.isArray(manuscript.reviewHistory) && manuscript.reviewHistory.length > 0 && (
+          <div className="bg-white rounded-lg shadow mb-6 overflow-hidden">
+            <div className="px-6 py-4 bg-indigo-50 border-b border-indigo-200">
+              <h2 className="text-base font-semibold text-indigo-900">Previous Review Rounds</h2>
+              <p className="text-xs text-indigo-700 mt-0.5">Check whether the author has addressed the concerns raised in earlier rounds.</p>
+            </div>
+            {manuscript.reviewHistory.map((h: any, hi: number) => (
+              <div key={hi} className="border-b border-gray-100 last:border-b-0">
+                <div className="px-6 py-3 bg-gray-50 flex items-center gap-3">
+                  <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Round {h.round}</span>
+                  {h.editorDecision && (
+                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                      h.editorDecision === 'accept' ? 'bg-green-100 text-green-700' :
+                      ['minor-revisions','major-revisions'].includes(h.editorDecision) ? 'bg-amber-100 text-amber-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      Editor: {String(h.editorDecision).replace(/-/g, ' ')}
+                    </span>
+                  )}
+                  {h.editorNotes && (
+                    <span className="text-xs text-gray-500 italic">"{h.editorNotes}"</span>
+                  )}
+                </div>
+                {Array.isArray(h.reviews) && h.reviews.filter((r: any) => r.submittedAt).map((r: any, ri: number) => (
+                  <div key={ri} className="px-6 py-3 border-t border-gray-50">
+                    <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+                      <span className="text-xs font-semibold text-gray-700">Reviewer {ri + 1}</span>
+                      {r.score != null && (
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">Score: {r.score}/5</span>
+                      )}
+                      {r.recommendation && (
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                          r.recommendation === 'accept' ? 'bg-green-100 text-green-700' :
+                          r.recommendation === 'reject' ? 'bg-red-100 text-red-700' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          {String(r.recommendation).replace(/-/g, ' ')}
+                        </span>
+                      )}
+                    </div>
+                    {r.feedback && (
+                      <p className="text-sm text-gray-700 whitespace-pre-line bg-gray-50 rounded p-2 border border-gray-100">{r.feedback}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Review Form */}
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">

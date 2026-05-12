@@ -188,6 +188,23 @@ const manuscriptSchema = new mongoose.Schema(
         submittedAt: Date,
       },
     ],
+    reviewHistory: [
+      {
+        round: Number,
+        editorDecision: String,
+        editorNotes: String,
+        archivedAt: Date,
+        reviews: [
+          {
+            reviewerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            score: Number,
+            recommendation: String,
+            feedback: String,
+            submittedAt: Date,
+          },
+        ],
+      },
+    ],
     editorDecision: String,
     editorNotes: String,
     revisionRound: { type: Number, default: 0 },

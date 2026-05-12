@@ -416,8 +416,54 @@ export default function DashboardPage() {
                         <p className="text-sm text-gray-600">Submission ID: {m.submissionId}</p>
                       )}
 
+                      {m.editorDecision && (
+                        <div className={`mt-2 px-3 py-2 rounded-lg text-sm font-medium ${
+                          m.editorDecision === 'accept' ? 'bg-green-50 text-green-800 border border-green-200' :
+                          ['minor-revisions','major-revisions'].includes(m.editorDecision) ? 'bg-amber-50 text-amber-800 border border-amber-200' :
+                          'bg-red-50 text-red-800 border border-red-200'
+                        }`}>
+                          Editor decision: {String(m.editorDecision).replace(/-/g, ' ')}
+                        </div>
+                      )}
+
                       {m.editorNotes && (
                         <p className="text-sm text-amber-700 mt-1">Editor note: {m.editorNotes}</p>
+                      )}
+
+                      {/* Reviewer feedback — visible to author after decision */}
+                      {Array.isArray(m.reviews) && m.reviews.some((r: any) => r.submittedAt) &&
+                        ['revision-requested', 'accepted', 'rejected'].includes(m.status) && (
+                        <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
+                            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Peer Review Feedback</p>
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            {m.reviews.filter((r: any) => r.submittedAt).map((r: any, i: number) => (
+                              <div key={i} className="px-3 py-3">
+                                <div className="flex items-center gap-3 mb-1.5">
+                                  <span className="text-xs font-semibold text-gray-700">Reviewer {i + 1}</span>
+                                  {r.score && (
+                                    <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
+                                      Score: {r.score}/5
+                                    </span>
+                                  )}
+                                  {r.recommendation && (
+                                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                                      r.recommendation === 'accept' ? 'bg-green-100 text-green-700' :
+                                      r.recommendation === 'reject' ? 'bg-red-100 text-red-700' :
+                                      'bg-amber-100 text-amber-700'
+                                    }`}>
+                                      {String(r.recommendation).replace(/-/g, ' ')}
+                                    </span>
+                                  )}
+                                </div>
+                                {r.feedback && (
+                                  <p className="text-sm text-gray-700 whitespace-pre-line">{r.feedback}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
 
                       {(m.workingDocument?.url || m.finalDocument?.url) && (
