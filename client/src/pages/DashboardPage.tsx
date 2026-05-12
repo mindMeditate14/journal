@@ -531,7 +531,7 @@ export default function DashboardPage() {
                       {m.status === 'revision-requested' && (
                         <button
                           type="button"
-                          onClick={() => navigate(`/manuscripts/${m._id}/revision`)}
+                          onClick={() => navigate(`/manuscripts/${m._id}/edit`)}
                           className="px-3 py-1.5 text-white text-sm rounded-lg hover:opacity-90 bg-amber-600"
                         >
                           ✏️ Revise

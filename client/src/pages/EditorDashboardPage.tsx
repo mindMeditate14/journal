@@ -436,7 +436,7 @@ export function EditorDashboardPage() {
               )}
 
               {/* Actions Based on Status */}
-              {selectedManuscript.status === 'submitted' && (
+              {(selectedManuscript.status === 'submitted' || selectedManuscript.status === 'under-review') && (
                 <div className="bg-white rounded-lg shadow p-6">
                   <h3 className="text-lg font-semibold mb-1">Assign or Re-assign Reviewers</h3>
                   <p className="text-sm text-gray-500 mb-4">

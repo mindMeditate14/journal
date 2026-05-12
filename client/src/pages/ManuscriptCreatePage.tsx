@@ -1,58 +1,27 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import apiClient from '../api/client';
-import { DISCIPLINES, METHODOLOGIES } from '../constants/manuscriptOptions';
+import { useClassifications } from '../hooks/useClassifications';
 import manuscriptTemplateFile from '../assets/Template.docx?url';
 
-type JournalOption = { _id: string; title: string; isOpen?: boolean };
+
 type AuthorInput = { name: string; email: string; affiliation: string };
 
 const EMPTY_AUTHOR: AuthorInput = { name: '', email: '', affiliation: '' };
 
 export default function ManuscriptCreatePage() {
   const navigate = useNavigate();
-  const [journals, setJournals] = useState<JournalOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { disciplines, methodologies } = useClassifications();
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [journalId, setJournalId] = useState('');
-  const [journalSearch, setJournalSearch] = useState('');
   const [title, setTitle] = useState('');
   const [abstract, setAbstract] = useState('');
-  const [body, setBody] = useState('');
   const [keywords, setKeywords] = useState('');
   const [discipline, setDiscipline] = useState('');
   const [methodology, setMethodology] = useState('');
   const [authors, setAuthors] = useState<AuthorInput[]>([{ ...EMPTY_AUTHOR }]);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
-
-  const filteredJournals = useMemo(() => {
-    const openJournals = journals.filter((journal) => journal.isOpen !== false);
-    if (!journalSearch.trim()) {
-      return openJournals;
-    }
-
-    const search = journalSearch.toLowerCase();
-    return openJournals.filter((journal) => journal.title.toLowerCase().includes(search));
-  }, [journals, journalSearch]);
-
-  useEffect(() => {
-    const loadJournals = async () => {
-      try {
-        const response = await apiClient.get('/journals/search', {
-          params: { q: '', page: 1, limit: 100, isOpen: true },
-        });
-        setJournals(response.data?.journals || []);
-      } catch {
-        toast.error('Failed to load journals');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadJournals();
-  }, []);
 
   const updateAuthor = (index: number, key: keyof AuthorInput, value: string) => {
     setAuthors((current) =>
@@ -80,22 +49,16 @@ export default function ManuscriptCreatePage() {
       .filter((author) => author.name || author.email || author.affiliation);
 
     return {
-      journalId,
       title: title.trim(),
       abstract: abstract.trim(),
-      body: body.trim() || abstract.trim(),
       keywords: keywords.split(',').map((keyword) => keyword.trim()).filter(Boolean),
-      discipline: discipline || 'General',
+      discipline: discipline || 'general',
       methodology: methodology || 'external-submission',
       authors: normalizedAuthors.length > 0 ? normalizedAuthors : [{ name: 'Anonymous', email: '', affiliation: '' }],
     };
   };
 
   const createManuscript = async () => {
-    if (!journalId) {
-      toast.error('Please select a target journal');
-      return null;
-    }
     if (!title.trim()) {
       toast.error('Title is required');
       return null;
@@ -155,14 +118,6 @@ export default function ManuscriptCreatePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">Loading...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -172,7 +127,7 @@ export default function ManuscriptCreatePage() {
 
           {/* Step indicator */}
           <div className="flex items-center gap-0 mb-8 overflow-x-auto">
-            {['Target Journal', 'Paper Details', 'Classification', 'Authors', 'Document'].map((step, i, arr) => (
+            {['Paper Details', 'Classification', 'Authors', 'Document'].map((step, i, arr) => (
               <div key={step} className="flex items-center shrink-0">
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200">
                   <span className="w-5 h-5 flex items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold">{i + 1}</span>
@@ -197,31 +152,7 @@ export default function ManuscriptCreatePage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="border-b pb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">1. Target Journal</h2>
-              <input
-                type="text"
-                value={journalSearch}
-                onChange={(event) => setJournalSearch(event.target.value)}
-                placeholder="Filter journals by title"
-                className="w-full px-4 py-3 mb-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              />
-              <select
-                value={journalId}
-                onChange={(event) => setJournalId(event.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">-- Select a journal --</option>
-                {filteredJournals.map((journal) => (
-                  <option key={journal._id} value={journal._id}>
-                    {journal.title}
-                  </option>
-                ))}
-              </select>
-              <p className="text-sm text-gray-500 mt-2">{filteredJournals.length} journals available</p>
-            </div>
-
-            <div className="border-b pb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">2. Paper Details</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">1. Paper Details</h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
@@ -245,21 +176,11 @@ export default function ManuscriptCreatePage() {
                     required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Paper Content</label>
-                  <textarea
-                    value={body}
-                    onChange={(event) => setBody(event.target.value)}
-                    placeholder="Paste your manuscript body here if you are not uploading a working document"
-                    rows={12}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
-                  />
-                </div>
               </div>
             </div>
 
             <div className="border-b pb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">3. Classification</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">2. Classification</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Discipline</label>
@@ -269,7 +190,7 @@ export default function ManuscriptCreatePage() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">Select discipline</option>
-                    {DISCIPLINES.map((disciplineOption) => (
+                    {disciplines.map((disciplineOption) => (
                       <option key={disciplineOption.value} value={disciplineOption.value}>
                         {disciplineOption.label}
                       </option>
@@ -284,7 +205,7 @@ export default function ManuscriptCreatePage() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">Select methodology</option>
-                    {METHODOLOGIES.map((methodologyOption) => (
+                    {methodologies.map((methodologyOption) => (
                       <option key={methodologyOption.value} value={methodologyOption.value}>
                         {methodologyOption.label}
                       </option>
@@ -315,7 +236,7 @@ export default function ManuscriptCreatePage() {
 
             <div className="border-b pb-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">4. Researchers / Authors</h2>
+                <h2 className="text-lg font-semibold text-gray-900">3. Researchers / Authors</h2>
                 <button
                   type="button"
                   onClick={addAuthor}
@@ -378,7 +299,7 @@ export default function ManuscriptCreatePage() {
 
             <div className="border-b pb-6">
               <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-                <h2 className="text-lg font-semibold text-gray-900">5. Working Document</h2>
+                <h2 className="text-lg font-semibold text-gray-900">4. Working Document</h2>
                 <a
                   href={manuscriptTemplateFile}
                   download="TradMedInt_Manuscript_Template.docx"
