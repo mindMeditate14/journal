@@ -27,6 +27,8 @@ import {
   uploadFinalDocument,
   uploadWorkingDocument,
   promoteWorkingToFinal,
+  sendFeedbackToAuthor,
+  triggerAiReview,
 } from '../controllers/manuscriptController.js';
 import { authMiddleware, requireRole } from '../middleware/auth.js';
 
@@ -90,6 +92,8 @@ router.post('/:id/reviews', authMiddleware, submitPeerReview);
 // Editor routes
 router.post('/:id/assign-reviewers', authMiddleware, requireRole(['editor', 'admin']), assignReviewers);
 router.patch('/:id/decision', authMiddleware, requireRole(['editor', 'admin']), makeEditorDecision);
+router.post('/:id/send-feedback', authMiddleware, requireRole(['editor', 'admin']), sendFeedbackToAuthor);
 router.post('/:id/publish', authMiddleware, requireRole(['editor', 'admin']), publishManuscript);
+router.post('/:id/ai-review', authMiddleware, requireRole(['editor', 'admin']), triggerAiReview);
 
 export default router;

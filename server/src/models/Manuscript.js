@@ -208,6 +208,36 @@ const manuscriptSchema = new mongoose.Schema(
     editorDecision: String,
     editorNotes: String,
     revisionRound: { type: Number, default: 0 },
+    decisionHistory: [
+      {
+        round: { type: Number, default: 0 },
+        decision: String,
+        editorNotes: String,
+        decidedAt: { type: Date, default: Date.now },
+        reviewerSummary: [
+          {
+            score: Number,
+            recommendation: String,
+            feedback: String,
+          },
+        ],
+      },
+    ],
+    aiReviewReport: {
+      generatedAt: Date,
+      status: { type: String, enum: ['pending', 'done', 'failed'], default: 'pending' },
+      overallScore: Number,       // 1-10
+      recommendation: String,     // 'accept' | 'minor-revisions' | 'major-revisions' | 'reject'
+      summary: String,
+      methodology: { score: Number, comments: String },
+      clarity: { score: Number, comments: String },
+      originality: { score: Number, comments: String },
+      completeness: { score: Number, comments: String },
+      ethicsAndCitations: { score: Number, comments: String },
+      keyStrengths: [String],
+      keyWeaknesses: [String],
+      suggestedActions: [String],
+    },
     submittedAt: Date,
     acceptedAt: Date,
     publishedAt: Date,

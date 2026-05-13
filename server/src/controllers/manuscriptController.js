@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import logger from '../utils/logger.js';
 import { registerZenodoDOI } from '../utils/zenodoService.js';
+import { runAndSaveAiReview } from '../utils/aiReviewService.js';
 import { buildDraftQuality, extractPdfMetadata } from '../services/manuscriptDraftService.js';
 import {
   generateClinicalDraft,
@@ -74,8 +75,26 @@ const parseAuthorsInput = (rawAuthors = '') => {
     .map((name) => ({ name, email: '' }));
 };
 
+const UPLOADS_ROOT = () => path.resolve(process.cwd(), '../uploads/manuscripts');
+
+/**
+ * Delete a previously stored manuscript file from disk.
+ * Silently ignores if the file is already gone.
+ */
+const deleteStoredFile = async (fileName) => {
+  if (!fileName) return;
+  try {
+    await fs.unlink(path.join(UPLOADS_ROOT(), fileName));
+    logger.info(`Deleted old manuscript file: ${fileName}`);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      logger.warn(`Could not delete manuscript file ${fileName}: ${err.message}`);
+    }
+  }
+};
+
 const buildStoredDocumentPayload = async (file, userId) => {
-  const uploadsRoot = path.resolve(process.cwd(), '../uploads/manuscripts');
+  const uploadsRoot = UPLOADS_ROOT();
   await fs.mkdir(uploadsRoot, { recursive: true });
 
   const ext = path.extname(file.originalname || '') || '';
@@ -326,7 +345,9 @@ export async function uploadFinalDocument(req, res, next) {
       });
     }
 
+    const oldFinalFileName = manuscript.finalDocument?.fileName;
     manuscript.finalDocument = await buildStoredDocumentPayload(req.file, req.user._id);
+    await deleteStoredFile(oldFinalFileName);
     manuscript.lastEditedBy = req.user._id;
     manuscript.updatedAt = new Date();
     await manuscript.save();
@@ -373,7 +394,9 @@ export async function uploadWorkingDocument(req, res, next) {
       return res.status(400).json({ error: 'Cannot change working document after publication' });
     }
 
+    const oldWorkingFileName = manuscript.workingDocument?.fileName;
     manuscript.workingDocument = await buildStoredDocumentPayload(req.file, req.user._id);
+    await deleteStoredFile(oldWorkingFileName);
 
     // Author revision upload: restore to review queue.
     const wasRevision = isOwner && manuscript.status === 'revision-requested';
@@ -870,6 +893,9 @@ export async function submitManuscript(req, res, next) {
       }
     }
 
+    // Trigger AI pre-review asynchronously (non-blocking)
+    runAndSaveAiReview(manuscript).catch(() => {});
+
     res.status(201).json({
       success: true,
       manuscript: {
@@ -989,6 +1015,9 @@ export async function deleteManuscript(req, res, next) {
     if (manuscript.status !== 'draft') {
       return res.status(400).json({ error: 'Only draft manuscripts can be deleted' });
     }
+    // Clean up any uploaded files before removing the record
+    await deleteStoredFile(manuscript.workingDocument?.fileName);
+    await deleteStoredFile(manuscript.finalDocument?.fileName);
     await Manuscript.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Manuscript deleted' });
   } catch (error) {
@@ -1361,6 +1390,20 @@ export async function makeEditorDecision(req, res, next) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
+    // Snapshot current reviewer feedback into decision history before overwriting
+    const reviewerSummary = (manuscript.reviews || [])
+      .filter(r => r.submittedAt)
+      .map(r => ({ score: r.score, recommendation: r.recommendation, feedback: r.feedback }));
+
+    if (!manuscript.decisionHistory) manuscript.decisionHistory = [];
+    manuscript.decisionHistory.push({
+      round: manuscript.revisionRound || 0,
+      decision,
+      editorNotes: editorNotes || '',
+      decidedAt: new Date(),
+      reviewerSummary,
+    });
+
     manuscript.editorDecision = decision;
     manuscript.editorNotes = editorNotes || '';
 
@@ -1728,6 +1771,58 @@ async function notifyEditorAllApproved(manuscript) {
 }
 
 /**
+ * Editor: Send current peer review feedback to author (without making a formal decision)
+ * POST /api/manuscripts/:id/send-feedback
+ */
+export async function sendFeedbackToAuthor(req, res, next) {
+  try {
+    const manuscript = await Manuscript.findById(req.params.id).populate('submittedBy', 'name email');
+    if (!manuscript) return res.status(404).json({ error: 'Manuscript not found' });
+
+    const submittedReviews = (manuscript.reviews || []).filter(r => r.submittedAt);
+    if (submittedReviews.length === 0) {
+      return res.status(400).json({ error: 'No submitted reviews to send yet.' });
+    }
+
+    const authorEmail = manuscript.submittedBy?.email;
+    if (!authorEmail) {
+      return res.status(400).json({ error: 'Author email not found.' });
+    }
+
+    const emailService = (await import('../utils/emailService.js')).default;
+    const editorNote = String(req.body.editorNote || '').trim();
+
+    const reviewerSection = submittedReviews.map((r, i) => `
+      <div style="margin-bottom:16px;padding:12px;background:#f9f9f9;border-left:3px solid #6366f1;">
+        <p style="margin:0 0 4px;font-weight:600;">Reviewer ${i + 1}</p>
+        ${r.score != null ? `<p style="margin:0 0 4px;font-size:13px;">Score: ${r.score}/5</p>` : ''}
+        ${r.recommendation ? `<p style="margin:0 0 8px;font-size:13px;">Recommendation: ${String(r.recommendation).replace(/-/g, ' ')}</p>` : ''}
+        ${r.feedback ? `<p style="margin:0;font-size:13px;white-space:pre-line;">${r.feedback}</p>` : ''}
+      </div>`).join('');
+
+    const html = `
+      <h2>Peer Review Feedback: ${manuscript.submissionId}</h2>
+      <p>Dear Author,</p>
+      <p>The editorial team is sharing peer review feedback on your manuscript <strong>"${manuscript.title}"</strong>. No formal decision has been made yet.</p>
+      ${editorNote ? `<div style="margin:16px 0;padding:12px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;"><strong>Note from Editor:</strong><br/>${editorNote}</div>` : ''}
+      <h3 style="margin-top:24px;">Peer Review Comments (${submittedReviews.length} reviewer${submittedReviews.length > 1 ? 's' : ''})</h3>
+      ${reviewerSection}
+      <p style="margin-top:20px;">You may use this feedback to strengthen your manuscript. A formal editorial decision will follow.</p>
+    `;
+
+    await emailService.send({
+      to: authorEmail,
+      subject: `Peer Review Feedback: ${manuscript.submissionId}`,
+      html,
+    });
+
+    res.json({ success: true, message: `Feedback sent to ${authorEmail}` });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
  * Send editorial decision email
  */
 async function sendDecisionEmail(manuscript, decision, notes) {
@@ -1801,5 +1896,27 @@ async function sendPublicationEmail(manuscript) {
       subject: `Your Article Published: ${manuscript.title}`,
       html: htmlContent,
     });
+  }
+}
+
+/**
+ * Editor: Manually trigger or re-trigger AI peer review
+ * POST /api/manuscripts/:id/ai-review
+ */
+export async function triggerAiReview(req, res, next) {
+  try {
+    const manuscript = await Manuscript.findById(req.params.id);
+    if (!manuscript) return res.status(404).json({ error: 'Manuscript not found' });
+
+    // Mark as pending immediately so the UI shows a spinner
+    manuscript.aiReviewReport = { status: 'pending', generatedAt: new Date() };
+    await manuscript.save();
+
+    // Run async, respond immediately
+    runAndSaveAiReview(manuscript).catch(() => {});
+
+    res.json({ success: true, message: 'AI review started — refresh in ~15 seconds.' });
+  } catch (error) {
+    next(error);
   }
 }

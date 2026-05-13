@@ -385,9 +385,38 @@ export default function DashboardPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-1">
                         <h3 className="text-lg font-semibold text-gray-900">{m.title}</h3>
-                        <span className={`text-xs px-2 py-1 rounded capitalize font-medium ${m.status === 'draft' ? 'bg-purple-100 text-purple-800' : m.status === 'published' ? 'bg-green-100 text-green-800' : m.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
-                          {String(m.status || 'draft').replace('-', ' ')}
-                        </span>
+                        {(() => {
+                          const tags: { label: string; className: string }[] = [];
+                          switch (m.status) {
+                            case 'draft':
+                              tags.push({ label: '✏️ Draft', className: 'bg-purple-100 text-purple-800' });
+                              break;
+                            case 'submitted':
+                              tags.push({ label: '📬 Submitted — Awaiting Editor', className: 'bg-blue-100 text-blue-700' });
+                              break;
+                            case 'under-review':
+                              tags.push({ label: '🔍 Under Peer Review', className: 'bg-indigo-100 text-indigo-700' });
+                              break;
+                            case 'revision-requested':
+                              tags.push({ label: '⚡ Action Required — Revision Needed', className: 'bg-amber-100 text-amber-800 border border-amber-300' });
+                              break;
+                            case 'accepted':
+                              tags.push({ label: '✅ Accepted', className: 'bg-green-100 text-green-800' });
+                              break;
+                            case 'published':
+                              tags.push({ label: '🎉 Published', className: 'bg-emerald-100 text-emerald-800' });
+                              break;
+                            case 'rejected':
+                              tags.push({ label: 'Rejected', className: 'bg-red-100 text-red-700' });
+                              break;
+                            default:
+                              tags.push({ label: String(m.status).replace(/-/g, ' '), className: 'bg-gray-100 text-gray-600' });
+                          }
+                          if (m.revisionRound > 0) tags.push({ label: `Round ${m.revisionRound + 1}`, className: 'bg-gray-100 text-gray-500 border border-gray-200' });
+                          return tags.map((t, i) => (
+                            <span key={i} className={`text-xs px-2 py-1 rounded font-medium ${t.className}`}>{t.label}</span>
+                          ));
+                        })()}
                       </div>
 
                       {m.status === 'draft' && (
@@ -462,6 +491,65 @@ export default function DashboardPage() {
                                 )}
                               </div>
                             ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Decision history timeline */}
+                      {Array.isArray(m.decisionHistory) && m.decisionHistory.length > 0 && (
+                        <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center gap-2">
+                            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Editorial History</span>
+                            <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">{m.decisionHistory.length} decision{m.decisionHistory.length > 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            {[...m.decisionHistory].reverse().map((h: any, i: number) => {
+                              const decisionLabel = h.decision === 'accept' ? '✅ Accepted'
+                                : h.decision === 'minor-revisions' ? '📝 Minor Revisions Requested'
+                                : h.decision === 'major-revisions' ? '📝 Major Revisions Requested'
+                                : h.decision === 'reject' ? '❌ Rejected'
+                                : h.decision === 'desk-reject' ? '❌ Desk Rejected'
+                                : String(h.decision).replace(/-/g, ' ');
+                              const decisionColor = h.decision === 'accept' ? 'text-green-700'
+                                : ['minor-revisions','major-revisions'].includes(h.decision) ? 'text-amber-700'
+                                : 'text-red-700';
+                              return (
+                                <div key={i} className="px-3 py-3">
+                                  <div className="flex items-center gap-3 mb-1">
+                                    <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-medium">Round {(h.round || 0) + 1}</span>
+                                    <span className={`text-sm font-semibold ${decisionColor}`}>{decisionLabel}</span>
+                                    {h.decidedAt && (
+                                      <span className="text-xs text-gray-400 ml-auto">{new Date(h.decidedAt).toLocaleDateString()}</span>
+                                    )}
+                                  </div>
+                                  {h.editorNotes && (
+                                    <p className="text-sm text-gray-700 mt-1 bg-amber-50 border border-amber-100 rounded px-2 py-1.5">
+                                      <span className="font-medium text-amber-800">Editor note: </span>{h.editorNotes}
+                                    </p>
+                                  )}
+                                  {Array.isArray(h.reviewerSummary) && h.reviewerSummary.length > 0 && (
+                                    <div className="mt-2 space-y-2">
+                                      {h.reviewerSummary.map((r: any, ri: number) => (
+                                        <div key={ri} className="bg-gray-50 rounded px-2 py-2 text-sm">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-xs font-semibold text-gray-600">Reviewer {ri + 1}</span>
+                                            {r.score != null && <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Score: {r.score}/5</span>}
+                                            {r.recommendation && (
+                                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                                r.recommendation === 'accept' ? 'bg-green-100 text-green-700' :
+                                                r.recommendation === 'reject' ? 'bg-red-100 text-red-700' :
+                                                'bg-amber-100 text-amber-700'
+                                              }`}>{String(r.recommendation).replace(/-/g, ' ')}</span>
+                                            )}
+                                          </div>
+                                          {r.feedback && <p className="text-gray-700 whitespace-pre-line">{r.feedback}</p>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}

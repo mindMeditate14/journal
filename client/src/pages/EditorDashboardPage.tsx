@@ -75,6 +75,9 @@ export function EditorDashboardPage() {
   const [selectedFinalDoc, setSelectedFinalDoc] = useState<File | null>(null);
   const [uploadingFinalDoc, setUploadingFinalDoc] = useState(false);
   const [promotingToFinal, setPromotingToFinal] = useState(false);
+  const [sendingFeedback, setSendingFeedback] = useState(false);
+  const [feedbackNote, setFeedbackNote] = useState('');
+  const [triggeringAiReview, setTriggeringAiReview] = useState(false);
 
   useEffect(() => {
     fetchSubmissions();
@@ -194,6 +197,38 @@ export function EditorDashboardPage() {
       toast.error(err.response?.data?.error || 'Failed to promote document');
     } finally {
       setPromotingToFinal(false);
+    }
+  };
+
+  const handleSendFeedbackToAuthor = async () => {
+    if (!selectedManuscript?._id) return;
+    try {
+      setSendingFeedback(true);
+      const res = await apiClient.post(`/manuscripts/${selectedManuscript._id}/send-feedback`, { editorNote: feedbackNote });
+      toast.success(res.data.message || 'Feedback sent to author');
+      setFeedbackNote('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to send feedback');
+    } finally {
+      setSendingFeedback(false);
+    }
+  };
+
+  const handleTriggerAiReview = async () => {
+    if (!selectedManuscript?._id) return;
+    try {
+      setTriggeringAiReview(true);
+      const res = await apiClient.post(`/manuscripts/${selectedManuscript._id}/ai-review`);
+      toast.success(res.data.message || 'AI review started');
+      // Optimistically show pending
+      setSelectedManuscript((prev: any) => ({
+        ...prev,
+        aiReviewReport: { ...prev?.aiReviewReport, status: 'pending' },
+      }));
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to trigger AI review');
+    } finally {
+      setTriggeringAiReview(false);
     }
   };
 
@@ -425,10 +460,149 @@ export function EditorDashboardPage() {
                 </div>
               </div>
 
+              {/* AI Pre-Review Report (editor-only) */}
+              {(() => {
+                const air = selectedManuscript.aiReviewReport;
+                const recColour: Record<string, string> = {
+                  'accept': 'bg-green-100 text-green-700 border-green-200',
+                  'minor-revisions': 'bg-blue-100 text-blue-700 border-blue-200',
+                  'major-revisions': 'bg-amber-100 text-amber-700 border-amber-200',
+                  'reject': 'bg-red-100 text-red-700 border-red-200',
+                };
+                const recLabel: Record<string, string> = {
+                  'accept': '✅ Accept',
+                  'minor-revisions': '🔵 Minor Revisions',
+                  'major-revisions': '⚡ Major Revisions',
+                  'reject': '❌ Reject',
+                };
+                const dimLabel: Record<string, string> = {
+                  methodology: '🔬 Methodology',
+                  clarity: '✍️ Clarity',
+                  originality: '💡 Originality',
+                  completeness: '📋 Completeness',
+                  ethicsAndCitations: '⚖️ Ethics & Citations',
+                };
+                return (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">🤖 AI Pre-Review Report</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">Internal use only — not visible to authors</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleTriggerAiReview}
+                        disabled={triggeringAiReview || air?.status === 'pending'}
+                        className="px-3 py-1.5 text-xs font-medium border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
+                      >
+                        {triggeringAiReview ? 'Starting…' : air?.status === 'pending' ? '⏳ Running…' : '↺ Re-run AI Review'}
+                      </button>
+                    </div>
+
+                    {!air && (
+                      <p className="text-sm text-gray-500 italic">No AI review generated yet. Click "Re-run AI Review" to generate one.</p>
+                    )}
+
+                    {air?.status === 'pending' && (
+                      <div className="flex items-center gap-2 text-indigo-600 text-sm">
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                        AI review is running — click Refresh in ~15 seconds.
+                      </div>
+                    )}
+
+                    {air?.status === 'failed' && (
+                      <p className="text-sm text-red-600">⚠️ AI review failed. Click "Re-run AI Review" to retry.</p>
+                    )}
+
+                    {air?.status === 'done' && (
+                      <>
+                        {/* Header scores */}
+                        <div className="flex flex-wrap items-center gap-3 mb-4">
+                          <span className="text-3xl font-bold text-indigo-700">{air.overallScore}<span className="text-base text-gray-400">/10</span></span>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium border ${recColour[air.recommendation] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                            {recLabel[air.recommendation] || air.recommendation}
+                          </span>
+                          {air.generatedAt && (
+                            <span className="text-xs text-gray-400 ml-auto">Generated {new Date(air.generatedAt).toLocaleString()}</span>
+                          )}
+                        </div>
+
+                        {/* Summary */}
+                        <p className="text-sm text-gray-800 bg-gray-50 rounded p-3 mb-4 italic">"{air.summary}"</p>
+
+                        {/* Dimension scores */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                          {(['methodology', 'clarity', 'originality', 'completeness', 'ethicsAndCitations'] as const).map(dim => {
+                            const d = (air as any)[dim];
+                            if (!d) return null;
+                            const pct = (d.score / 10) * 100;
+                            const barColour = d.score >= 7 ? 'bg-green-500' : d.score >= 5 ? 'bg-amber-400' : 'bg-red-400';
+                            return (
+                              <div key={dim} className="border border-gray-100 rounded p-3">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="text-xs font-semibold text-gray-700">{dimLabel[dim]}</span>
+                                  <span className="text-sm font-bold text-indigo-700">{d.score}/10</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-1.5 mb-2">
+                                  <div className={`h-1.5 rounded-full ${barColour}`} style={{ width: `${pct}%` }} />
+                                </div>
+                                <p className="text-xs text-gray-600">{d.comments}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Strengths / Weaknesses / Actions */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="bg-green-50 rounded p-3">
+                            <p className="text-xs font-semibold text-green-700 mb-1">✅ Key Strengths</p>
+                            <ul className="list-disc list-inside space-y-0.5">
+                              {(air.keyStrengths || []).map((s: string, i: number) => (
+                                <li key={i} className="text-xs text-gray-700">{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="bg-red-50 rounded p-3">
+                            <p className="text-xs font-semibold text-red-700 mb-1">⚠️ Key Weaknesses</p>
+                            <ul className="list-disc list-inside space-y-0.5">
+                              {(air.keyWeaknesses || []).map((w: string, i: number) => (
+                                <li key={i} className="text-xs text-gray-700">{w}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div className="bg-blue-50 rounded p-3">
+                            <p className="text-xs font-semibold text-blue-700 mb-1">📌 Suggested Actions</p>
+                            <ul className="list-disc list-inside space-y-0.5">
+                              {(air.suggestedActions || []).map((a: string, i: number) => (
+                                <li key={i} className="text-xs text-gray-700">{a}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Peer Reviews */}
               {selectedManuscript.reviews && selectedManuscript.reviews.length > 0 && (
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h3 className="text-lg font-semibold mb-4">Peer Reviews</h3>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <h3 className="text-lg font-semibold">Peer Reviews</h3>
+                    {(() => {
+                      const submittedCount = selectedManuscript.reviews.filter((r: any) => r.submittedAt).length;
+                      if (submittedCount === 0) return null;
+                      return (
+                        <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-medium">
+                          {submittedCount} of {selectedManuscript.reviews.length} submitted
+                        </span>
+                      );
+                    })()}
+                  </div>
 
                   <div className="space-y-4">
                     {selectedManuscript.reviews.map((review, i) => (
@@ -484,6 +658,31 @@ export function EditorDashboardPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Send feedback to author */}
+                  {selectedManuscript.reviews.some((r: any) => r.submittedAt) && !['accepted', 'published', 'rejected'].includes(selectedManuscript.status) && (
+                    <div className="mt-5 pt-5 border-t border-gray-200">
+                      <p className="text-sm font-semibold text-gray-700 mb-1">📧 Send Reviewer Feedback to Author</p>
+                      <p className="text-xs text-gray-500 mb-3">
+                        This emails the author all submitted reviewer comments without making a formal decision. Useful when you want the author to start revising while you finalize your decision.
+                      </p>
+                      <textarea
+                        value={feedbackNote}
+                        onChange={e => setFeedbackNote(e.target.value)}
+                        placeholder="Optional note from editor to accompany the feedback…"
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 mb-2"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSendFeedbackToAuthor}
+                        disabled={sendingFeedback}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium"
+                      >
+                        {sendingFeedback ? 'Sending…' : '📧 Send Feedback to Author'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -551,7 +750,7 @@ export function EditorDashboardPage() {
                 </div>
               )}
 
-              {(selectedManuscript.status === 'under-review' || selectedManuscript.status === 'revision-requested') && (
+              {(selectedManuscript.status === 'submitted' || selectedManuscript.status === 'under-review' || selectedManuscript.status === 'revision-requested') && (
                 <div className="bg-white rounded-lg shadow p-6">
                   <h3 className="text-lg font-semibold mb-4">Make Editorial Decision</h3>
 
@@ -596,6 +795,62 @@ export function EditorDashboardPage() {
                       Record Decision
                     </button>
                   </form>
+                </div>
+              )}
+
+              {/* Editorial history timeline — always visible when there is history */}
+              {Array.isArray(selectedManuscript.decisionHistory) && selectedManuscript.decisionHistory.length > 0 && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold mb-4">Editorial History</h3>
+                  <div className="space-y-4">
+                    {[...selectedManuscript.decisionHistory].reverse().map((h: any, i: number) => {
+                      const decisionLabel = h.decision === 'accept' ? '✅ Accepted'
+                        : h.decision === 'minor-revisions' ? '📝 Minor Revisions'
+                        : h.decision === 'major-revisions' ? '📝 Major Revisions'
+                        : h.decision === 'reject' ? '❌ Rejected'
+                        : h.decision === 'desk-reject' ? '❌ Desk Rejected'
+                        : String(h.decision).replace(/-/g, ' ');
+                      const borderColor = h.decision === 'accept' ? 'border-green-300'
+                        : ['minor-revisions','major-revisions'].includes(h.decision) ? 'border-amber-300'
+                        : 'border-red-300';
+                      return (
+                        <div key={i} className={`border-l-4 ${borderColor} pl-4`}>
+                          <div className="flex items-center gap-3 mb-1">
+                            <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded font-medium">Round {(h.round || 0) + 1}</span>
+                            <span className="text-sm font-semibold text-gray-800">{decisionLabel}</span>
+                            {h.decidedAt && (
+                              <span className="text-xs text-gray-400 ml-auto">{new Date(h.decidedAt).toLocaleString()}</span>
+                            )}
+                          </div>
+                          {h.editorNotes && (
+                            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5 mt-1">
+                              <span className="font-medium">Editor note: </span>{h.editorNotes}
+                            </p>
+                          )}
+                          {Array.isArray(h.reviewerSummary) && h.reviewerSummary.length > 0 && (
+                            <div className="mt-2 space-y-2">
+                              {h.reviewerSummary.map((r: any, ri: number) => (
+                                <div key={ri} className="bg-gray-50 rounded px-3 py-2 text-sm">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-semibold text-gray-600">Reviewer {ri + 1}</span>
+                                    {r.score != null && <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Score: {r.score}/5</span>}
+                                    {r.recommendation && (
+                                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                        r.recommendation === 'accept' ? 'bg-green-100 text-green-700' :
+                                        r.recommendation === 'reject' ? 'bg-red-100 text-red-700' :
+                                        'bg-amber-100 text-amber-700'
+                                      }`}>{String(r.recommendation).replace(/-/g, ' ')}</span>
+                                    )}
+                                  </div>
+                                  {r.feedback && <p className="text-gray-700 whitespace-pre-line">{r.feedback}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
