@@ -255,10 +255,7 @@ export async function submitExistingPaper(req, res, next) {
     let resolvedJournalId = journalId;
     if (!resolvedJournalId) {
       const defaultJournal = await Journal.findOne({ isOpen: true }).sort({ createdAt: 1 });
-      if (!defaultJournal) {
-        return res.status(400).json({ error: 'No journal is currently open for submissions' });
-      }
-      resolvedJournalId = defaultJournal._id;
+      if (defaultJournal) resolvedJournalId = defaultJournal._id;
     } else {
       const journal = await Journal.findById(resolvedJournalId);
       if (!journal) {
@@ -282,7 +279,9 @@ export async function submitExistingPaper(req, res, next) {
       abstract: String(abstract).trim().slice(0, 1000),
       body: String(description || abstract || '').trim().slice(0, 12000).padEnd(1000, ' '),
       sourcePath: 'existing_upload',
-      journalId: resolvedJournalId, ? parsedAuthors : [{ name: req.user.email || 'Author', email: req.user.email || '' }],
+      journalId: resolvedJournalId,
+      keywords: parsedKeywords,
+      authors: parsedAuthors.length > 0 ? parsedAuthors : [{ name: req.user.email || 'Author', email: req.user.email || '' }],
       discipline: String(discipline || 'General').trim(),
       methodology: String(methodology || 'external-submission').trim(),
       workingDocument,
@@ -835,16 +834,12 @@ export async function submitManuscript(req, res, next) {
       if (!journal) {
         return res.status(404).json({ error: 'Journal not found' });
       }
+      if (!journal.isOpen) {
+        return res.status(400).json({ error: 'This journal is not accepting submissions' });
+      }
     } else {
       journal = await Journal.findOne({ isOpen: true }).sort({ createdAt: 1 });
-      if (!journal) {
-        return res.status(400).json({ error: 'No journal is currently open for submissions' });
-      }
-      finalPayload.journalId = journal._id;
-    }
-
-    if (!journal.isOpen) {
-      return res.status(400).json({ error: 'This journal is not accepting submissions' });
+      if (journal) finalPayload.journalId = journal._id;
     }
 
     if (!manuscript) {
@@ -895,9 +890,6 @@ export async function submitManuscript(req, res, next) {
         logger.warn(`Failed to send submission confirmation email: ${emailErr.message}`);
       }
     }
-
-    // Trigger AI pre-review asynchronously (non-blocking)
-    runAndSaveAiReview(manuscript).catch(() => {});
 
     res.status(201).json({
       success: true,
@@ -1043,11 +1035,11 @@ export async function viewManuscript(req, res, next) {
     }
 
     // Authorization: author, editor, assigned reviewer, or admin
-    const isAuthor = manuscript.submittedBy._id.toString() === req.user._id.toString();
+    const isAuthor = manuscript.submittedBy?._id?.toString() === req.user._id.toString();
     const userRoles = Array.isArray(req.roles) ? req.roles : [req.user.role].filter(Boolean);
     const hasEditorRole = userRoles.includes('editor') || userRoles.includes('admin');
     const isEditor = manuscript.assignedEditor?._id?.toString() === req.user._id.toString() || hasEditorRole;
-    const isJournalOwner = manuscript.journalId.owner?.toString() === req.user._id.toString();
+    const isJournalOwner = manuscript.journalId?.owner?.toString() === req.user._id.toString();
     const isPublished = manuscript.status === 'published';
     const isAssignedReviewer = manuscript.reviews.some(
       r => r.reviewerId?._id?.toString() === req.user._id.toString() ||
@@ -1193,22 +1185,20 @@ export async function assignReviewers(req, res, next) {
       });
     }
 
-    if (!manuscript.journalId) {
-      return res.status(400).json({ error: 'Manuscript is not linked to a journal' });
-    }
-
-    // Check authorization (editor or journal owner)
-    const journal = await Journal.findById(manuscript.journalId);
-    if (!journal) {
-      return res.status(404).json({ error: 'Journal not found for manuscript' });
-    }
-
+    // Check authorization — editor/admin can always assign; journal owner check only if journal exists
     const userRoles = Array.isArray(req.roles) ? req.roles : [req.user.role].filter(Boolean);
     const isEditor = userRoles.includes('editor') || userRoles.includes('admin');
-    const isJournalOwner = journal.owner.toString() === req.user._id.toString();
 
-    if (!isEditor && !isJournalOwner) {
-      return res.status(403).json({ error: 'Unauthorized' });
+    if (!isEditor) {
+      // Fall back to journal owner check
+      if (!manuscript.journalId) {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
+      const journal = await Journal.findById(manuscript.journalId);
+      const isJournalOwner = journal && journal.owner?.toString() === req.user._id.toString();
+      if (!isJournalOwner) {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
     }
 
     // Initialize reviews array if not exists
@@ -1384,13 +1374,18 @@ export async function makeEditorDecision(req, res, next) {
       return res.status(404).json({ error: 'Manuscript not found' });
     }
 
-    // Check authorization
-    const isEditor = manuscript.assignedEditor?.toString() === req.user._id.toString() || req.user.role === 'admin';
-    const journal = await Journal.findById(manuscript.journalId);
-    const isJournalOwner = journal.owner.toString() === req.user._id.toString();
+    // Check authorization — editor/admin can always decide; journal owner check only if journal exists
+    const userRoles2 = Array.isArray(req.roles) ? req.roles : [req.user.role].filter(Boolean);
+    const isEditor = manuscript.assignedEditor?.toString() === req.user._id.toString()
+      || req.user.role === 'admin'
+      || userRoles2.includes('editor');
 
-    if (!isEditor && !isJournalOwner) {
-      return res.status(403).json({ error: 'Unauthorized' });
+    if (!isEditor) {
+      const journal = manuscript.journalId ? await Journal.findById(manuscript.journalId) : null;
+      const isJournalOwner = journal && journal.owner?.toString() === req.user._id.toString();
+      if (!isJournalOwner) {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
     }
 
     // Snapshot current reviewer feedback into decision history before overwriting
@@ -1484,8 +1479,9 @@ export async function publishManuscript(req, res, next) {
       return res.status(404).json({ error: 'Manuscript not found' });
     }
 
-    // Check authorization
-    const isEditor = req.user.role === 'admin' || manuscript.journalId.owner.toString() === req.user._id.toString();
+    // Check authorization — editors/admins bypass journal check entirely
+    const isEditor = req.user.role === 'admin' || req.user.role === 'editor' ||
+      (manuscript.journalId?.owner?.toString() === req.user._id.toString());
     if (!isEditor) {
       return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -1554,7 +1550,7 @@ export async function publishManuscript(req, res, next) {
           publicationYear: new Date(manuscript.publishedAt).getFullYear(),
           doi: manuscript.doi || undefined,
           journal: {
-            name: manuscript.journalId.title || 'TradMed International',
+            name: manuscript.journalId?.title || 'NexusJournal',
           },
           sourceProvenance: [
             {
@@ -1622,7 +1618,6 @@ function canPublish(manuscript) {
     manuscript.abstract && manuscript.abstract.length > 50 &&
     manuscript.authors && manuscript.authors.length > 0 &&
     manuscript.authors.every(a => a.name && a.email) &&
-    manuscript.body && manuscript.body.length > 1000 &&
     manuscript.discipline
   );
 }
@@ -1905,20 +1900,19 @@ async function sendPublicationEmail(manuscript) {
 /**
  * Editor: Manually trigger or re-trigger AI peer review
  * POST /api/manuscripts/:id/ai-review
+ * Runs synchronously — returns the completed report (or error) in the response.
  */
 export async function triggerAiReview(req, res, next) {
   try {
+    // Re-fetch from DB to get the absolute latest body/abstract/document state
     const manuscript = await Manuscript.findById(req.params.id);
     if (!manuscript) return res.status(404).json({ error: 'Manuscript not found' });
 
-    // Mark as pending immediately so the UI shows a spinner
-    manuscript.aiReviewReport = { status: 'pending', generatedAt: new Date() };
-    await manuscript.save();
+    await runAndSaveAiReview(manuscript);
 
-    // Run async, respond immediately
-    runAndSaveAiReview(manuscript).catch(() => {});
-
-    res.json({ success: true, message: 'AI review started — refresh in ~15 seconds.' });
+    // Reload to return the persisted report
+    const updated = await Manuscript.findById(req.params.id);
+    res.json({ success: true, aiReviewReport: updated.aiReviewReport });
   } catch (error) {
     next(error);
   }

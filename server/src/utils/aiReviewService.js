@@ -1,5 +1,35 @@
 import { GoogleGenAI } from '@google/genai';
+import { createRequire } from 'module';
+import fs from 'fs';
+import path from 'path';
 import logger from './logger.js';
+
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
+
+const UPLOADS_ROOT = () => path.resolve(process.cwd(), '../uploads/manuscripts');
+
+/**
+ * Try to extract text from the manuscript's uploaded PDF.
+ * Returns extracted text string, or null if unavailable/failed.
+ */
+async function extractPdfText(manuscript) {
+  // Prefer finalDocument, fall back to workingDocument
+  const fileName = manuscript.finalDocument?.fileName || manuscript.workingDocument?.fileName;
+  if (!fileName) return null;
+  const filePath = path.join(UPLOADS_ROOT(), fileName);
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    const buffer = fs.readFileSync(filePath);
+    const data = await pdfParse(buffer, { max: 0 }); // max:0 = all pages
+    const text = data.text?.trim();
+    logger.info(`📄 Extracted ${text?.length || 0} chars from PDF: ${fileName}`);
+    return text && text.length > 100 ? text : null;
+  } catch (e) {
+    logger.warn(`PDF extraction failed for ${fileName}: ${e.message}`);
+    return null;
+  }
+}
 
 const SYSTEM_PROMPT = `You are an expert academic peer reviewer for TradMed International, a journal specialising in traditional medicine, integrative health, and ethnomedicine research. Your role is to provide a structured, impartial pre-screening review of submitted manuscripts.
 
@@ -35,9 +65,15 @@ export async function runAiReview(manuscript) {
 
   const ai = new GoogleGenAI({ apiKey });
 
-  // Build the content to review — use what's available
   const authorNames = (manuscript.authors || []).map(a => a.name).join(', ');
   const keywords = (manuscript.keywords || []).join(', ');
+
+  // Try to extract full text from the uploaded PDF first
+  const pdfText = await extractPdfText(manuscript);
+  const sourceLabel = pdfText ? 'FULL TEXT (extracted from uploaded PDF)' : 'STORED BODY TEXT';
+  const bodyText = pdfText
+    ? pdfText.substring(0, 30000)  // up to ~30k chars from PDF
+    : (manuscript.body || '').substring(0, 8000);
 
   const userContent = `
 MANUSCRIPT TITLE: ${manuscript.title}
@@ -48,11 +84,11 @@ DISCIPLINES: ${(manuscript.disciplines || []).join(', ') || 'Not specified'}
 ABSTRACT:
 ${manuscript.abstract || '(No abstract provided)'}
 
-${manuscript.body ? `FULL TEXT:\n${manuscript.body.substring(0, 8000)}` : ''}
+${bodyText ? `${sourceLabel}:\n${bodyText}` : '(No full text available)'}
 `.trim();
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: userContent,
     config: {
       systemInstruction: SYSTEM_PROMPT,

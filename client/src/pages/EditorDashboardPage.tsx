@@ -175,7 +175,7 @@ export function EditorDashboardPage() {
     }
 
     try {
-      const response = await apiClient.post(`/manuscripts/${selectedManuscript._id}/publish`);
+      const response = await apiClient.post(`/manuscripts/${selectedManuscript._id}/publish`, {}, { timeout: 120000 });
 
       toast.success(`Published! DOI: ${response.data.manuscript.doi}`);
       fetchSubmissions();
@@ -218,15 +218,19 @@ export function EditorDashboardPage() {
     if (!selectedManuscript?._id) return;
     try {
       setTriggeringAiReview(true);
-      const res = await apiClient.post(`/manuscripts/${selectedManuscript._id}/ai-review`);
-      toast.success(res.data.message || 'AI review started');
-      // Optimistically show pending
+      const res = await apiClient.post(`/manuscripts/${selectedManuscript._id}/ai-review`, {}, { timeout: 90000 });
+      // Response contains the completed report directly
       setSelectedManuscript((prev: any) => ({
         ...prev,
-        aiReviewReport: { ...prev?.aiReviewReport, status: 'pending' },
+        aiReviewReport: res.data.aiReviewReport,
       }));
+      if (res.data.aiReviewReport?.status === 'done') {
+        toast.success('AI review complete');
+      } else {
+        toast.error('AI review failed — check manuscript content');
+      }
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to trigger AI review');
+      toast.error(err.response?.data?.error || 'Failed to run AI review');
     } finally {
       setTriggeringAiReview(false);
     }
@@ -492,24 +496,24 @@ export function EditorDashboardPage() {
                       <button
                         type="button"
                         onClick={handleTriggerAiReview}
-                        disabled={triggeringAiReview || air?.status === 'pending'}
+                        disabled={triggeringAiReview}
                         className="px-3 py-1.5 text-xs font-medium border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
                       >
-                        {triggeringAiReview ? 'Starting…' : air?.status === 'pending' ? '⏳ Running…' : '↺ Re-run AI Review'}
+                        {triggeringAiReview ? '⏳ Analysing…' : air?.status === 'done' ? '↺ Re-run AI Review' : '▶ Run AI Review'}
                       </button>
                     </div>
 
-                    {!air && (
-                      <p className="text-sm text-gray-500 italic">No AI review generated yet. Click "Re-run AI Review" to generate one.</p>
+                    {!air && !triggeringAiReview && (
+                      <p className="text-sm text-gray-500 italic">No AI review yet. Click "Run AI Review" to analyse the latest uploaded manuscript.</p>
                     )}
 
-                    {air?.status === 'pending' && (
+                    {triggeringAiReview && (
                       <div className="flex items-center gap-2 text-indigo-600 text-sm">
                         <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                         </svg>
-                        AI review is running — click Refresh in ~15 seconds.
+                        Analysing manuscript — this may take 20–30 seconds…
                       </div>
                     )}
 
