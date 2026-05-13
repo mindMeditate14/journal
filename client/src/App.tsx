@@ -18,7 +18,6 @@ import NewProjectPage from './pages/NewProjectPage';
 import PaperDetailPage from './pages/PaperDetailPage';
 import AdminPage from './pages/AdminPage';
 import AdminUsersPage from './pages/AdminUsersPage';
-import JournalsPage from './pages/JournalsPage';
 import ManuscriptCreatePage from './pages/ManuscriptCreatePage';
 import { SubmitManuscriptPage } from './pages/SubmitManuscriptPage';
 import { EditorDashboardPage } from './pages/EditorDashboardPage';
@@ -97,14 +96,6 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminUsersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/journals"
-            element={
-              <ProtectedRoute allowedRoles={['admin', 'editor', 'researcher']}>
-                <JournalsPage />
               </ProtectedRoute>
             }
           />

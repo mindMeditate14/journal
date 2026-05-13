@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminAPI, journalAPI } from '../services/api';
-import { AdminUser, AdminStats, Role, Journal } from '../types';
+import { adminAPI } from '../services/api';
+import { AdminUser, AdminStats, Role } from '../types';
 import { useAuthStore } from '../utils/authStore';
 import apiClient from '../api/client';
 import toast from 'react-hot-toast';
@@ -252,42 +252,6 @@ export default function AdminPage() {
   };
 
   const [editingRoles, setEditingRoles] = useState<string | null>(null); // userId being edited
-
-  // --- Journals management ---
-  const [journals, setJournals] = useState<Journal[]>([]);
-  const [journalSearch, setJournalSearch] = useState('');
-  const [loadingJournals, setLoadingJournals] = useState(false);
-  const [deletingJournal, setDeletingJournal] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-
-  const loadJournals = useCallback(async (q = '') => {
-    setLoadingJournals(true);
-    try {
-      const data = await journalAPI.search(q, {}, 1, 50);
-      setJournals(Array.isArray(data.journals) ? data.journals : []);
-    } catch {
-      toast.error('Failed to load journals');
-    } finally {
-      setLoadingJournals(false);
-    }
-  }, []);
-
-  useEffect(() => { loadJournals(); }, []);
-
-  const handleDeleteJournal = async (id: string) => {
-    setDeletingJournal(id);
-    try {
-      await journalAPI.delete(id);
-      setJournals((prev) => prev.filter((j) => j._id !== id));
-      toast.success('Journal deleted');
-      loadStats();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Failed to delete journal');
-    } finally {
-      setDeletingJournal(null);
-      setConfirmDeleteId(null);
-    }
-  };
 
   const startEditRoles = (user: AdminUser) => {
     setPendingRoles((prev) => ({ ...prev, [user._id]: getUserRoles(user) }));
@@ -576,102 +540,6 @@ export default function AdminPage() {
               </button>
             </div>
           )}
-        </div>
-        {/* Journals management */}
-        <div className="mt-10">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">Journals</h2>
-          <p className="text-sm text-gray-500 mb-4">Delete incorrect or test journals. This cannot be undone.</p>
-
-          <div className="flex gap-3 mb-3">
-            <input
-              type="text"
-              value={journalSearch}
-              onChange={(e) => setJournalSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && loadJournals(journalSearch.trim())}
-              placeholder="Search journals by title…"
-              className="flex-1 min-w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              type="button"
-              onClick={() => loadJournals(journalSearch.trim())}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
-            >
-              Search
-            </button>
-            {journalSearch && (
-              <button
-                type="button"
-                onClick={() => { setJournalSearch(''); loadJournals(''); }}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            {loadingJournals ? (
-              <div className="px-4 py-6 text-sm text-gray-500 text-center">Loading…</div>
-            ) : journals.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-gray-500 text-center">No journals found.</div>
-            ) : (
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600">Title</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600">Status</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600">ISSN</th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-600">Owner</th>
-                    <th className="px-4 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {journals.map((j) => (
-                    <tr key={j._id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900 max-w-xs truncate">{j.title}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${j.isOpen ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                          {j.isOpen ? 'Open' : 'Closed'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">{j.issn || '—'}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{(j as any).owner?.email || (j as any).owner || '—'}</td>
-                      <td className="px-4 py-3 text-right">
-                        {confirmDeleteId === j._id ? (
-                          <div className="flex items-center justify-end gap-2">
-                            <span className="text-xs text-red-600 font-medium">Delete this journal?</span>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteJournal(j._id)}
-                              disabled={deletingJournal === j._id}
-                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
-                            >
-                              {deletingJournal === j._id ? 'Deleting…' : 'Confirm'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="px-3 py-1 border border-gray-300 text-xs rounded hover:bg-gray-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteId(j._id)}
-                            className="px-3 py-1 border border-red-300 text-red-600 text-xs rounded hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
         </div>
         </>)}
 

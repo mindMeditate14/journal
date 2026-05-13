@@ -20,30 +20,6 @@ export interface User {
   };
 }
 
-export interface Journal {
-  _id: string;
-  title: string;
-  abstract: string;
-  content: string;
-  authors: Array<{
-    name: string;
-    affiliation?: string;
-    role?: string;
-  }>;
-  doi: string;
-  issn?: string;
-  isOpen?: boolean;
-  status: 'draft' | 'submitted' | 'under_review' | 'published' | 'archived';
-  publishedAt: Date;
-  owner: string;
-  keywords: string[];
-  metrics: {
-    views: number;
-    citations: number;
-    downloads: number;
-  };
-}
-
 export interface Paper {
   _id: string;
   title: string;

@@ -118,10 +118,7 @@ const buildStoredDocumentPayload = async (file, userId) => {
   };
 };
 
-const validateSubmissionPayload = ({ journalId, title, abstract, authors, discipline, methodology }) => {
-  if (!journalId) {
-    return 'Please select a target journal';
-  }
+const validateSubmissionPayload = ({ title, abstract, authors, discipline, methodology }) => {
   if (!title || title.length < 10 || title.length > 300) {
     return 'Title must be 10–300 characters';
   }
@@ -251,17 +248,25 @@ export async function submitExistingPaper(req, res, next) {
       return res.status(400).json({ error: 'Document file is required (PDF/Word).' });
     }
 
-    if (!journalId || !title || !abstract) {
-      return res.status(400).json({ error: 'journalId, title, and abstract are required' });
+    if (!title || !abstract) {
+      return res.status(400).json({ error: 'title and abstract are required' });
     }
 
-    const journal = await Journal.findById(journalId);
-    if (!journal) {
-      return res.status(404).json({ error: 'Journal not found' });
-    }
-
-    if (!journal.isOpen) {
-      return res.status(400).json({ error: 'This journal is not accepting submissions' });
+    let resolvedJournalId = journalId;
+    if (!resolvedJournalId) {
+      const defaultJournal = await Journal.findOne({ isOpen: true }).sort({ createdAt: 1 });
+      if (!defaultJournal) {
+        return res.status(400).json({ error: 'No journal is currently open for submissions' });
+      }
+      resolvedJournalId = defaultJournal._id;
+    } else {
+      const journal = await Journal.findById(resolvedJournalId);
+      if (!journal) {
+        return res.status(404).json({ error: 'Journal not found' });
+      }
+      if (!journal.isOpen) {
+        return res.status(400).json({ error: 'This journal is not accepting submissions' });
+      }
     }
 
     const parsedKeywords = String(keywords || '')
@@ -277,9 +282,7 @@ export async function submitExistingPaper(req, res, next) {
       abstract: String(abstract).trim().slice(0, 1000),
       body: String(description || abstract || '').trim().slice(0, 12000).padEnd(1000, ' '),
       sourcePath: 'existing_upload',
-      journalId,
-      keywords: parsedKeywords,
-      authors: parsedAuthors.length > 0 ? parsedAuthors : [{ name: req.user.email || 'Author', email: req.user.email || '' }],
+      journalId: resolvedJournalId, ? parsedAuthors : [{ name: req.user.email || 'Author', email: req.user.email || '' }],
       discipline: String(discipline || 'General').trim(),
       methodology: String(methodology || 'external-submission').trim(),
       workingDocument,

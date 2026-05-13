@@ -1,5 +1,5 @@
 import apiClient from '../api/client';
-import { AdminStats, AdminUser, IngestRun, Paper, PaperGraph, User, Journal, Manuscript, ResearchProject, Role } from '../types';
+import { AdminStats, AdminUser, IngestRun, Paper, PaperGraph, User, Manuscript, ResearchProject, Role } from '../types';
 
 export const authAPI = {
   register: async (email: string, password: string) => {
@@ -13,30 +13,6 @@ export const authAPI = {
   getMe: async (): Promise<User> => {
     const { data } = await apiClient.get('/auth/me');
     return data;
-  },
-};
-
-export const journalAPI = {
-  search: async (query: string, filters: any = {}, page = 1, limit = 20) => {
-    const { data } = await apiClient.get('/journals/search', {
-      params: { q: query, ...filters, page, limit },
-    });
-    return data;
-  },
-  getById: async (id: string): Promise<Journal> => {
-    const { data } = await apiClient.get(`/journals/${id}`);
-    return data;
-  },
-  create: async (journal: Partial<Journal>): Promise<Journal> => {
-    const { data } = await apiClient.post('/journals', journal);
-    return data;
-  },
-  update: async (id: string, updates: Partial<Journal>): Promise<Journal> => {
-    const { data } = await apiClient.patch(`/journals/${id}`, updates);
-    return data;
-  },
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/journals/${id}`);
   },
 };
 
