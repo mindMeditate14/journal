@@ -417,7 +417,7 @@ export default function PaperViewPage() {
                     <span className="text-xs text-indigo-200 truncate max-w-xs">{paper.title}</span>
                   </div>
                   <a
-                    href={paper.urls.pdf}
+                    href={`/api/papers/${paper._id}/download`}
                     download
                     className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-700 bg-white px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition shrink-0"
                   >
@@ -448,9 +448,21 @@ export default function PaperViewPage() {
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Downloads</h3>
                 <div className="space-y-2">
                   {paper.urls?.pdf && (
+                    <a
+                      href={`/api/papers/${paper._id}/download`}
+                      download
+                      className="flex items-center gap-2.5 px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition w-full"
+                    >
+                      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Download PDF
+                    </a>
+                  )}
+                  {paper.urls?.pdf && (
                     <button
                       onClick={() => setViewMode('pdf')}
-                      className="flex items-center gap-2.5 px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition w-full"
+                      className="flex items-center gap-2.5 px-4 py-2.5 border border-indigo-200 text-indigo-700 bg-indigo-50 text-sm font-medium rounded-lg hover:bg-indigo-100 transition w-full"
                     >
                       <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />

@@ -4,6 +4,7 @@ import {
   getRelatedPapers,
   searchPapers,
 } from '../services/paperService.js';
+import { buildCoverPdf } from '../utils/coverPageService.js';
 
 export const search = async (req, res, next) => {
   try {
@@ -58,9 +59,27 @@ export const getRelated = async (req, res, next) => {
   }
 };
 
+export const download = async (req, res, next) => {
+  try {
+    const paper = await getPaperById(req.params.id);
+    const safeTitle = (paper.title || 'paper').replace(/[^a-z0-9]/gi, '_').substring(0, 60);
+    const pdfBuffer = await buildCoverPdf(paper);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="TradMed_${safeTitle}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
 export default {
   search,
   getById,
   getGraph,
   getRelated,
+  download,
 };

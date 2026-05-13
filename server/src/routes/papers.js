@@ -1,9 +1,10 @@
 import express from 'express';
-import { getById, getGraph, getRelated, search } from '../controllers/paperController.js';
+import { getById, getGraph, getRelated, search, download } from '../controllers/paperController.js';
 
 const router = express.Router();
 
 router.get('/search', search);
+router.get('/:id/download', download);
 router.get('/:id/graph', getGraph);
 router.get('/:id/related', getRelated);
 router.get('/:id', getById);

@@ -1541,16 +1541,15 @@ export async function publishManuscript(req, res, next) {
           ? `https://journal.mind-meditate.com${manuscript.finalDocument.url}`
           : '';
 
-        await Paper.create({
+        const paperDoc = {
           title: manuscript.title || 'Untitled',
           normalizedTitle: (manuscript.title || '').toLowerCase().trim(),
           abstract: manuscript.abstract || '',
           authors: paperAuthors,
           publishedAt: manuscript.publishedAt,
           publicationYear: new Date(manuscript.publishedAt).getFullYear(),
-          doi: manuscript.doi || undefined,
           journal: {
-            name: manuscript.journalId?.title || 'NexusJournal',
+            name: manuscript.journalId?.title || 'TradMed International',
           },
           sourceProvenance: [
             {
@@ -1564,7 +1563,6 @@ export async function publishManuscript(req, res, next) {
           topics: manuscript.metadata?.sectionHeadings || [],
           isOpenAccess: true,
           qualityScore: 80,
-          // Full-text content from manuscript
           body: manuscript.body || manuscript.content || '',
           sections: (manuscript.sections || []).map(s => ({
             title: s.title || '',
@@ -1579,8 +1577,17 @@ export async function publishManuscript(req, res, next) {
             source: pdfAbsoluteUrl,
             pdf: pdfAbsoluteUrl,
           },
-        });
-        logger.info(`✓ Paper record created for manuscript: ${manuscript._id}`);
+        };
+        // Upsert by DOI — idempotent if publish is retried
+        const filter = manuscript.doi
+          ? { doi: manuscript.doi.toLowerCase().trim() }
+          : { 'sourceProvenance.sourceId': manuscript._id.toString() };
+        const result = await Paper.findOneAndUpdate(
+          filter,
+          { $set: { ...paperDoc, doi: manuscript.doi ? manuscript.doi.toLowerCase().trim() : undefined } },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        logger.info(`✓ Paper record upserted for manuscript ${manuscript._id}: Paper ${result._id}`);
       } catch (paperError) {
         logger.error(`⚠️ Failed to create Paper record for manuscript ${manuscript._id}: ${paperError.message}`);
         // Don't fail the publish if Paper creation fails - manuscript is already published

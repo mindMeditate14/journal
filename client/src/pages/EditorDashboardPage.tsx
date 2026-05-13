@@ -236,6 +236,104 @@ export function EditorDashboardPage() {
     }
   };
 
+  const handleDownloadAiReviewPdf = async () => {
+    const air = selectedManuscript?.aiReviewReport;
+    if (!air || air.status !== 'done') return;
+
+    const journalName = selectedManuscript.journalId?.title || 'TradMed International';
+    const manuscriptTitle = selectedManuscript.title || 'Untitled';
+    const generatedAt = air.generatedAt ? new Date(air.generatedAt).toLocaleString() : new Date().toLocaleString();
+    const recLabel: Record<string, string> = {
+      'accept': '✅ Accept',
+      'minor-revisions': '🔵 Minor Revisions',
+      'major-revisions': '⚡ Major Revisions',
+      'reject': '❌ Reject',
+    };
+    const dimLabel: Record<string, string> = {
+      methodology: 'Methodology',
+      clarity: 'Clarity',
+      originality: 'Originality',
+      completeness: 'Completeness',
+      ethicsAndCitations: 'Ethics & Citations',
+    };
+    const dims = ['methodology', 'clarity', 'originality', 'completeness', 'ethicsAndCitations'] as const;
+
+    const html = `
+      <div style="font-family: Georgia, serif; max-width: 740px; margin: 0 auto; padding: 40px; color: #1a1a1a;">
+        <div style="border-bottom: 3px solid #4338ca; padding-bottom: 16px; margin-bottom: 24px;">
+          <p style="font-size: 12px; color: #6b7280; margin: 0 0 4px 0; text-transform: uppercase; letter-spacing: 0.05em;">Pre-Review Report — Internal Use Only</p>
+          <h1 style="font-size: 20px; font-weight: bold; color: #1e1b4b; margin: 0 0 6px 0;">${manuscriptTitle}</h1>
+          <p style="font-size: 13px; color: #4b5563; margin: 0 0 3px 0;">Journal: <strong>${journalName}</strong></p>
+          <p style="font-size: 13px; color: #4b5563; margin: 0;">Author(s): <strong>${(selectedManuscript.authors || []).map((a: any) => a.name).filter(Boolean).join(', ') || 'Unknown'}</strong></p>
+          <p style="font-size: 12px; color: #9ca3af; margin: 6px 0 0 0;">Generated: ${generatedAt}</p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 24px; background: #f5f3ff; padding: 16px; border-radius: 8px; border: 1px solid #e0e7ff;">
+          <div style="text-align: center;">
+            <span style="font-size: 36px; font-weight: bold; color: #4338ca;">${air.overallScore}</span>
+            <span style="font-size: 14px; color: #6b7280;">/10</span>
+            <p style="font-size: 11px; color: #6b7280; margin: 2px 0 0 0;">Overall Score</p>
+          </div>
+          <div>
+            <p style="font-size: 14px; font-weight: 600; color: #374151; margin: 0 0 4px 0;">Recommendation</p>
+            <p style="font-size: 16px; font-weight: bold; color: #4338ca; margin: 0;">${recLabel[air.recommendation] || air.recommendation}</p>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px; background: #f9fafb; padding: 14px; border-left: 4px solid #4338ca; border-radius: 0 6px 6px 0;">
+          <p style="font-size: 12px; font-weight: 700; color: #374151; margin: 0 0 6px 0; text-transform: uppercase;">Summary</p>
+          <p style="font-size: 13px; color: #4b5563; font-style: italic; margin: 0;">"${air.summary}"</p>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <p style="font-size: 12px; font-weight: 700; color: #374151; margin: 0 0 10px 0; text-transform: uppercase;">Dimension Scores</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            ${dims.map(dim => {
+              const d = (air as any)[dim];
+              if (!d) return '';
+              return `<tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 8px 6px; font-weight: 600; width: 38%;">${dimLabel[dim]}</td>
+                <td style="padding: 8px 6px; font-weight: bold; color: #4338ca; width: 12%; text-align: center;">${d.score}/10</td>
+                <td style="padding: 8px 6px; color: #6b7280;">${d.comments}</td>
+              </tr>`;
+            }).join('')}
+          </table>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+          <div style="background: #f0fdf4; padding: 12px; border-radius: 6px; border: 1px solid #bbf7d0;">
+            <p style="font-size: 11px; font-weight: 700; color: #15803d; margin: 0 0 6px 0;">KEY STRENGTHS</p>
+            ${(air.keyStrengths || []).map((s: string) => `<p style="font-size: 12px; color: #374151; margin: 3px 0;">• ${s}</p>`).join('')}
+          </div>
+          <div style="background: #fef2f2; padding: 12px; border-radius: 6px; border: 1px solid #fecaca;">
+            <p style="font-size: 11px; font-weight: 700; color: #b91c1c; margin: 0 0 6px 0;">KEY WEAKNESSES</p>
+            ${(air.keyWeaknesses || []).map((w: string) => `<p style="font-size: 12px; color: #374151; margin: 3px 0;">• ${w}</p>`).join('')}
+          </div>
+          <div style="background: #eff6ff; padding: 12px; border-radius: 6px; border: 1px solid #bfdbfe;">
+            <p style="font-size: 11px; font-weight: 700; color: #1d4ed8; margin: 0 0 6px 0;">SUGGESTED ACTIONS</p>
+            ${(air.suggestedActions || []).map((a: string) => `<p style="font-size: 12px; color: #374151; margin: 3px 0;">• ${a}</p>`).join('')}
+          </div>
+        </div>
+
+        <p style="font-size: 10px; color: #9ca3af; text-align: center; margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 12px;">
+          This report is for editorial assistance only. It is confidential and not shared with authors.
+        </p>
+      </div>
+    `;
+
+    const html2pdf = (await import('html2pdf.js')).default;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    const safeTitle = manuscriptTitle.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+    await html2pdf().set({
+      margin: 0,
+      filename: `AI_Review_${safeTitle}.pdf`,
+      image: { type: 'jpeg', quality: 0.97 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    }).from(container).save();
+  };
+
   const handleUploadFinalDocument = async () => {
     if (!selectedManuscript?._id) return;
     if (!selectedFinalDoc) {
@@ -493,14 +591,25 @@ export function EditorDashboardPage() {
                         <h3 className="text-lg font-semibold">🤖 AI Pre-Review Report</h3>
                         <p className="text-xs text-gray-500 mt-0.5">Internal use only — not visible to authors</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleTriggerAiReview}
-                        disabled={triggeringAiReview}
-                        className="px-3 py-1.5 text-xs font-medium border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
-                      >
-                        {triggeringAiReview ? '⏳ Analysing…' : air?.status === 'done' ? '↺ Re-run AI Review' : '▶ Run AI Review'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {air?.status === 'done' && (
+                          <button
+                            type="button"
+                            onClick={handleDownloadAiReviewPdf}
+                            className="px-3 py-1.5 text-xs font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                          >
+                            ⬇ Download PDF
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleTriggerAiReview}
+                          disabled={triggeringAiReview}
+                          className="px-3 py-1.5 text-xs font-medium border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 disabled:opacity-50"
+                        >
+                          {triggeringAiReview ? '⏳ Analysing…' : air?.status === 'done' ? '↺ Re-run AI Review' : '▶ Run AI Review'}
+                        </button>
+                      </div>
                     </div>
 
                     {!air && !triggeringAiReview && (

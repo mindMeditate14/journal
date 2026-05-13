@@ -143,6 +143,10 @@ export default function AdminPage() {
       keywords: Array.isArray(ms.keywords) ? ms.keywords.join(', ') : (ms.keywords || ''),
       discipline: ms.discipline || '',
       status: ms.status || '',
+      methodology: ms.methodology || '',
+      authors: Array.isArray(ms.authors)
+        ? ms.authors.map((a: any) => ({ name: a.name || '', email: a.email || '', affiliation: a.affiliation || '', orcid: a.orcid || '' }))
+        : [],
     });
   };
 
@@ -156,6 +160,8 @@ export default function AdminPage() {
         keywords: editForm.keywords.split(',').map((k: string) => k.trim()).filter(Boolean),
         discipline: editForm.discipline.trim(),
         status: editForm.status,
+        methodology: editForm.methodology?.trim() || undefined,
+        authors: editForm.authors?.length > 0 ? editForm.authors : undefined,
       };
       const { data } = await apiClient.patch(`/manuscripts/${selectedMs._id}`, payload);
       const updated = data.manuscript || { ...selectedMs, ...payload };
@@ -700,13 +706,80 @@ export default function AdminPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Keywords <span className="text-gray-400 font-normal">(comma-separated)</span></label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Methodology / Article Type</label>
                         <input
                           type="text"
-                          value={editForm.keywords}
-                          onChange={e => setEditForm((f: any) => ({ ...f, keywords: e.target.value }))}
+                          value={editForm.methodology || ''}
+                          onChange={e => setEditForm((f: any) => ({ ...f, methodology: e.target.value }))}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
                         />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Keywords <span className="text-gray-400 font-normal">(comma-separated)</span></label>
+                      <input
+                        type="text"
+                        value={editForm.keywords}
+                        onChange={e => setEditForm((f: any) => ({ ...f, keywords: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    {/* Authors */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-medium text-gray-600">Authors</label>
+                        <button
+                          type="button"
+                          onClick={() => setEditForm((f: any) => ({ ...f, authors: [...(f.authors || []), { name: '', email: '', affiliation: '', orcid: '' }] }))}
+                          className="text-xs text-indigo-600 hover:underline"
+                        >+ Add Author</button>
+                      </div>
+                      <div className="space-y-2">
+                        {(editForm.authors || []).map((author: any, idx: number) => (
+                          <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                            <div className="grid grid-cols-2 gap-2 mb-2">
+                              <input
+                                type="text"
+                                placeholder="Full name"
+                                value={author.name}
+                                onChange={e => setEditForm((f: any) => { const a = [...f.authors]; a[idx] = { ...a[idx], name: e.target.value }; return { ...f, authors: a }; })}
+                                className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500"
+                              />
+                              <input
+                                type="email"
+                                placeholder="Email"
+                                value={author.email}
+                                onChange={e => setEditForm((f: any) => { const a = [...f.authors]; a[idx] = { ...a[idx], email: e.target.value }; return { ...f, authors: a }; })}
+                                className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                placeholder="Affiliation"
+                                value={author.affiliation}
+                                onChange={e => setEditForm((f: any) => { const a = [...f.authors]; a[idx] = { ...a[idx], affiliation: e.target.value }; return { ...f, authors: a }; })}
+                                className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500"
+                              />
+                              <div className="flex gap-1">
+                                <input
+                                  type="text"
+                                  placeholder="ORCID (optional)"
+                                  value={author.orcid}
+                                  onChange={e => setEditForm((f: any) => { const a = [...f.authors]; a[idx] = { ...a[idx], orcid: e.target.value }; return { ...f, authors: a }; })}
+                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setEditForm((f: any) => ({ ...f, authors: f.authors.filter((_: any, i: number) => i !== idx) }))}
+                                  className="px-2 py-1.5 text-red-500 hover:bg-red-50 rounded text-xs"
+                                >✕</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
