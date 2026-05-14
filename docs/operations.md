@@ -104,7 +104,11 @@ ssh -i "$HOME\.ssh\kvm4-hostinger" root@76.13.211.100 "nano /opt/nexusjournal/se
 | `BASE_URL` | Public URL used in meta tags + sitemap (change when migrating domain) |
 | `CORS_ORIGIN` | Comma-separated allowed origins |
 | `ZENODO_API_KEY` | Zenodo API token |
-| `SMTP_HOST/PORT/USER/PASS/FROM` | Email settings |
+| `SMTP_HOST` | `127.0.0.1` — local Postfix relay (no external SMTP service) |
+| `SMTP_PORT` | `25` (local relay, no TLS needed) |
+| `SMTP_USER` | `noreply@tradmedint.com` |
+| `SMTP_PASS` | *(empty — local relay needs no auth)* |
+| `SMTP_FROM` | `"TradMed International <noreply@tradmedint.com>"` |
 | `GEMINI_API_KEY` | Google Gemini AI key |
 
 After editing `.env`:
@@ -183,3 +187,39 @@ certbot certificates
 certbot renew --nginx
 ```
 Auto-renews via cron.
+
+---
+
+## Email (Postfix + Dovecot)
+
+NexusJournal uses the **VPS-local Postfix** as an SMTP relay — no external email service. Emails are sent from `noreply@tradmedint.com`.
+
+### Mailbox locations
+```
+/var/mail/vhosts/tradmedint.com/noreply/   ← inbound mail storage
+/etc/postfix/vmailbox                       ← Postfix mailbox map
+/etc/dovecot/users                          ← Dovecot auth (passwd-file)
+```
+
+### DNS records (set May 2026)
+| Type | Host | Value |
+|---|---|---|
+| TXT (SPF) | `tradmedint.com` | `v=spf1 ip4:76.13.211.100 mx a ~all` |
+| TXT (DKIM) | `default._domainkey.tradmedint.com` | `v=DKIM1; h=sha256; k=rsa; p=...` |
+| TXT (DMARC) | `_dmarc.tradmedint.com` | `v=DMARC1; p=none; rua=mailto:postmaster@tradmedint.com; adkim=s; aspf=s` |
+
+DKIM private key: `/etc/opendkim/keys/tradmedint.com/default.private`
+
+### Test email delivery
+```powershell
+scp -i "$HOME\.ssh\kvm4-hostinger" "C:\temp\send-test-email.sh" root@76.13.211.100:/tmp/
+ssh -i "$HOME\.ssh\kvm4-hostinger" root@76.13.211.100 "bash /tmp/send-test-email.sh"
+```
+
+### Verify DNS records
+```powershell
+ssh -i "$HOME\.ssh\kvm4-hostinger" root@76.13.211.100 "dig TXT tradmedint.com +short ; dig TXT default._domainkey.tradmedint.com +short ; dig TXT _dmarc.tradmedint.com +short"
+```
+
+### Webmail access
+Roundcube webmail is at `https://webmail.archetiq.com`. Log in with `noreply@tradmedint.com` / `Abcd12345#` to read incoming mail.

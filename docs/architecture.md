@@ -16,7 +16,7 @@ NexusJournal (deployed as the **TradMed International** journal platform) is a f
 | **AI** | Google Gemini (`@google/genai`) |
 | **PDF generation** | `pdf-lib` (server-side cover page) · `html2pdf.js` (client-side AI review PDF) |
 | **DOI / Archive** | Zenodo REST API |
-| **Email** | Nodemailer + SMTP |
+| **Email** | Nodemailer + local Postfix relay (`noreply@tradmedint.com`, port 25, no auth) |
 | **Process manager** | PM2 (`nexusjournal`, port **5005**) |
 | **Web server** | Nginx (reverse proxy + static SPA) |
 
@@ -143,6 +143,13 @@ client/src/
 - **Manuscript** — internal editorial record. Has status, reviews, author communications, uploaded files.
 - **Paper** — public discovery record. Created when a manuscript is published. Has `$text` index for full-text search. Must be created via Mongoose (not raw mongosh) for the index to work.
 
+### Paper collection contents (as of May 2026)
+The `paper` MongoDB collection contains **337 records**:
+- **5 NexusJournal-published papers** — Zenodo DOIs (`10.5281/zenodo.*`), full PDFs, Google Scholar indexed
+- **332 reference/knowledge-base papers** — imported from CSV (external DOIs from Ayurveda/Siddha literature), no uploaded PDF
+
+All 337 records appear in `sitemap.xml` and get `citation_*` meta tags. The 5 Zenodo papers are the authoritative NexusJournal publications. The MongoDB collection name is **`paper`** (singular) — not `papers` (which is an empty legacy collection).
+
 ### Paper `$text` index weights
 ```
 title: 8 · keywords: 5 · abstract: 3 · authors.name: 2
@@ -155,7 +162,7 @@ title: 8 · keywords: 5 · abstract: 3 · authors.name: 2
 `GET /papers/:id` is server-rendered by Express (not the SPA) — injects all `citation_*` Highwire Press meta tags into `index.html` before serving. `citation_pdf_url` points to `/papers/:id/download` (same subdirectory, required by Scholar).
 
 ### BASE_URL env var
-`BASE_URL` in `.env` controls all absolute URLs in meta tags and sitemap. Change this when migrating to `tradmedint.com`.
+`BASE_URL` in `.env` controls all absolute URLs in meta tags and sitemap. Currently set to `https://tradmedint.com` (migration completed May 2026).
 
 ### Publish timeout
 Client overrides Axios timeout to 120 seconds for `POST /manuscripts/:id/publish`. Server calls Zenodo (external), which can take 30–60 s.

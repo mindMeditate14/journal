@@ -10,25 +10,30 @@ function initializeTransporter() {
   if (transporter) return transporter;
 
   const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = parseInt(process.env.SMTP_PORT || '587');
+  const smtpPort = parseInt(process.env.SMTP_PORT || '25');
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
   const smtpFrom = process.env.SMTP_FROM || smtpUser;
 
-  if (!smtpHost || !smtpUser || !smtpPass) {
+  if (!smtpHost || !smtpUser) {
     logger.warn('Email configuration incomplete. Emails will not be sent.');
     return null;
   }
 
-  transporter = nodemailer.createTransport({
+  const transportConfig = {
     host: smtpHost,
     port: smtpPort,
-    secure: smtpPort === 465, // TLS if port 587, SSL if port 465
-    auth: {
-      user: smtpUser,
-      pass: smtpPass,
-    },
-  });
+    secure: smtpPort === 465,
+  };
+
+  // Only add auth if a password is configured (local relay needs no auth)
+  if (smtpPass) {
+    transportConfig.auth = { user: smtpUser, pass: smtpPass };
+  } else {
+    transportConfig.ignoreTLS = true;
+  }
+
+  transporter = nodemailer.createTransport(transportConfig);
 
   logger.info(`📧 Email service initialized: ${smtpHost}:${smtpPort}`);
   return transporter;

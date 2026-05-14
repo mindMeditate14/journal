@@ -16,7 +16,7 @@ Google Scholar does **not** have a submission form. It crawls your site via Goog
 |---|---|---|
 | `citation_*` meta tags | ✅ Live | Injected server-side by Express for every `/papers/:id` URL |
 | `citation_pdf_url` | ✅ Correct | Points to `/papers/:id/download` (same subdomain — required by Scholar) |
-| `sitemap.xml` | ✅ Live | `https://journal.mind-meditate.com/sitemap.xml` — all paper URLs |
+| `sitemap.xml` | ✅ Live | `https://tradmedint.com/sitemap.xml` — all 337 paper URLs |
 | `robots.txt` | ✅ Live | `Allow: *` + Sitemap pointer |
 | Server-side rendering | ✅ Live | `/papers/*` routes through Express (not SPA) so crawlers see content |
 | Branded PDF download | ✅ Live | `/papers/:id/download` serves TradMed cover page + manuscript PDF |
@@ -43,27 +43,11 @@ Google Scholar does **not** have a submission form. It crawls your site via Goog
 
 ## Submitting to Google Search Console
 
-**Do this after the final domain is live (`tradmedint.com`).**
-
-### Step 1 — Verify site ownership
-
-1. Go to [search.google.com/search-console](https://search.google.com/search-console)
-2. Click **Add property** → URL prefix → `https://tradmedint.com`
-3. Choose **HTML tag** method
-4. Copy the tag value: `<meta name="google-site-verification" content="XXXX...">`
-5. Give Copilot the value (e.g. `XXXX...`) and it will inject it into the server
-
-**What Copilot will do with the tag value:**
-Add this to `buildMetaTags()` in `server/src/index.js`:
-```js
-tags.push(`<meta name="google-site-verification" content="${VERIFICATION_VALUE}">`);
-```
-Then redeploy `server/src/index.js`.
+✅ **Verification complete** (May 14, 2026) — HTML file method used. File served at `https://tradmedint.com/google0899841f8e4c769b.html`. Source file at `client/public/google0899841f8e4c769b.html` (persists through Vite builds).
 
 ### Step 2 — Submit sitemap
 
-1. In Search Console left sidebar → **Sitemaps**
-2. Enter `sitemap.xml` → **Submit**
+⏳ **Pending** — In Search Console left sidebar → **Sitemaps** → enter `sitemap.xml` → **Submit**.
 
 ### Step 3 — Request indexing for each paper
 
@@ -71,22 +55,26 @@ For each published paper URL:
 1. Paste URL in the Search Console top bar
 2. Click **Request Indexing**
 
-Current published paper URLs (update after domain migration):
-- `https://tradmedint.com/papers/69f950f7...` — Modern Consumption Patterns
-- `https://tradmedint.com/papers/6a017f00...` — Archetiq Archetype Blueprint
+All 5 published NexusJournal paper URLs:
+- `https://tradmedint.com/papers/69f962655e4c17fc2398bf70` — Modern Consumption Patterns
+- `https://tradmedint.com/papers/6a017f58bad7fe84aa659e42` — Archetiq Archetype Blueprint
 - `https://tradmedint.com/papers/6a043d4c84f269b21472c288` — AI in Siddha Medicine
+- `https://tradmedint.com/papers/6a04337e8221e4ae0a0fe99d` — Pancha Bhootha Medicine
+- `https://tradmedint.com/papers/6a0433ca8221e4ae0a0fea4d` — Can Nutrition Delay Menopausal Complications?
 
 ---
 
 ## Zenodo Records
 
-The 3 published papers also have records on Zenodo which are independently indexed by Google Scholar. Zenodo records are publicly accessible:
+All 5 published papers have records on Zenodo which are independently indexed by Google Scholar:
 
-| Zenodo record | DOI | Status |
+| Zenodo record | DOI | Title |
 |---|---|---|
-| `zenodo.org/records/20118137` | `10.5281/zenodo.20118137` | HTTP 200 (public) |
-| `zenodo.org/records/20117947` | `10.5281/zenodo.20117947` | HTTP 200 (public) |
-| `zenodo.org/records/20153396` | `10.5281/zenodo.20153396` | HTTP 200 (public) |
+| `zenodo.org/records/20118137` | `10.5281/zenodo.20118137` | Modern Consumption Patterns |
+| `zenodo.org/records/20117947` | `10.5281/zenodo.20117947` | Archetiq Archetype Blueprint |
+| `zenodo.org/records/20153396` | `10.5281/zenodo.20153396` | AI in Siddha Medicine |
+| `zenodo.org/records/20153547` | `10.5281/zenodo.20153547` | Pancha Bhootha Medicine |
+| `zenodo.org/records/20153596` | `10.5281/zenodo.20153596` | Can Nutrition Delay Menopausal Complications? |
 
 Zenodo records are picked up by Google Scholar automatically — no action needed beyond confirming they are published (not draft).
 

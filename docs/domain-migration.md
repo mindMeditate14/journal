@@ -1,9 +1,9 @@
 # NexusJournal — Domain Migration to tradmedint.com
 
-## Status: PENDING (do not start until DNS is pointed)
+## Status: COMPLETE (migrated May 14, 2026)
 
-Current domain: `https://journal.mind-meditate.com`  
-Target domain:  `https://tradmedint.com`
+Previous domain: `https://journal.mind-meditate.com` → 301 redirects to new domain  
+Current domain:  `https://tradmedint.com`
 
 ---
 
@@ -190,7 +190,7 @@ pm2 restart nexusjournal --update-env && echo DONE
 
 ## Step 6 — Update Paper Records in MongoDB
 
-The 3 published Paper records have the old domain in `urls.pdf`. Update them:
+The 5 published Paper records (Zenodo DOIs) have the old domain in `urls.pdf`. Update them:
 
 ```bash
 ssh -i ~/.ssh/kvm4-hostinger root@76.13.211.100 "node --input-type=module << 'EOF'
@@ -223,14 +223,24 @@ Update it, then rebuild and deploy.
 
 ## Step 8 — Google Search Console + Scholar
 
-Only do this after the domain is fully live and working:
+✅ **COMPLETE** — Verification done via HTML file method (not meta tag). File at `/opt/nexusjournal/public/google0899841f8e4c769b.html` (source: `client/public/google0899841f8e4c769b.html` — included in Vite build output so it survives redeploys).
 
-1. Go to [search.google.com/search-console](https://search.google.com/search-console)
-2. Add property `https://tradmedint.com`
-3. Choose **HTML tag** verification — Google gives you a `<meta name="google-site-verification" content="...">` tag
-4. Tell Copilot the tag value and it will inject it into the server's HTML template
-5. Submit sitemap: `https://tradmedint.com/sitemap.xml`
-6. Request indexing for each paper URL
+Next steps still needed:
+1. Submit sitemap: `https://tradmedint.com/sitemap.xml` in Search Console → **Sitemaps**
+2. Request indexing for each of the 5 published paper URLs (see `docs/google-scholar.md`)
+
+---
+
+## Step 9 — Email (noreply@tradmedint.com)
+
+✅ **COMPLETE** — Configured May 14, 2026.
+
+- Mailbox created on VPS Postfix/Dovecot at `/var/mail/vhosts/tradmedint.com/noreply/`
+- `emailService.js` updated to use local relay (port 25, no auth)
+- SPF, DKIM, DMARC DNS records added and verified
+- DKIM key: `/etc/opendkim/keys/tradmedint.com/default.private`
+
+See `docs/operations.md` → Email section for details.
 
 ---
 
