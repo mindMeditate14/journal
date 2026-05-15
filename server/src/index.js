@@ -97,6 +97,11 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/practice-data', practiceDataRoutes);
 
+// ── SPA fallback for bare /papers path (nginx location /papers/ redirects /papers → /papers/) ──
+app.get(['/papers', '/papers/'], (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+});
+
 // ── Scholar-visible paper pages (/papers/:id → inject citation meta tags) ──
 app.get('/papers/:id', async (req, res, next) => {
   try {

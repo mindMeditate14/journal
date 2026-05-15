@@ -83,6 +83,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
             label={item.label}
             path={item.path}
             isActive={location.pathname === item.path || location.pathname.startsWith(item.path + '/')}
+            onClick={() => navigate(item.path)}
             collapsed={collapsed}
           />
         ))}
