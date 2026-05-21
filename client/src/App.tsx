@@ -26,6 +26,9 @@ import { MyReviewsPage } from './pages/MyReviewsPage';
 import PublishedPapersPage from './pages/PublishedPapersPage';
 import PublishedPapersWrapper from './components/PublishedPapersWrapper';
 import PaperViewPage from './pages/PaperViewPage';
+import AboutPage from './pages/AboutPage';
+import EditorialBoardPage from './pages/EditorialBoardPage';
+import JournalPolicyPage from './pages/JournalPolicyPage';
 
 export default function App() {
   const restoreSession = useAuthStore((state) => state.restoreSession);
@@ -48,6 +51,11 @@ export default function App() {
         <Route path="/" element={<PublishedPapersWrapper />} />
         <Route path="/papers" element={<PublishedPapersWrapper />} />
         <Route path="/papers/:id" element={<PaperViewPage />} />
+
+        {/* Journal Info Pages */}
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/editorial-board" element={<EditorialBoardPage />} />
+        <Route path="/journal-policy" element={<JournalPolicyPage />} />
 
         {/* Protected Routes with Sidebar */}
         <Route element={<SidebarLayout />}>

@@ -96,7 +96,9 @@ export default function PaperViewPage() {
             <Link to="/papers" className="flex items-center gap-2">
               <span className="text-lg font-bold text-indigo-700">TradMed International</span>
             </Link>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
+              <Link to="/about" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">About</Link>
+              <Link to="/editorial-board" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">Editorial Board</Link>
               <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-indigo-700">Log In</Link>
               <Link to="/register" className="text-sm font-semibold bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition">
                 Submit Research

@@ -51,7 +51,10 @@ export default function PublishedPapersPage() {
         <header className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
             <span className="text-lg font-bold tracking-tight text-indigo-700">TradMed International</span>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-5">
+              <Link to="/about" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">About</Link>
+              <Link to="/editorial-board" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">Editorial Board</Link>
+              <Link to="/journal-policy" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">Policy</Link>
               <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-indigo-700">Sign In</Link>
               <Link to="/register" className="text-sm font-semibold bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition-colors">
                 Submit Research
@@ -467,15 +470,18 @@ export default function PublishedPapersPage() {
         <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
             <span className="font-bold text-white text-base">TradMed International</span>
+            <p className="text-xs text-slate-500 mt-0.5">Published by Mind Meditate Resources, Malaysia</p>
           </div>
-          <div className="flex gap-6 text-xs">
+          <div className="flex flex-wrap gap-4 text-xs">
+            <Link to="/about" className="hover:text-white">About</Link>
+            <Link to="/editorial-board" className="hover:text-white">Editorial Board</Link>
+            <Link to="/journal-policy" className="hover:text-white">Journal Policy</Link>
+            <span>·</span>
             <span>ISSN (Online): Pending</span>
             <span>·</span>
-            <span>Double-blind peer review</span>
-            <span>·</span>
-            <span>Open Access</span>
+            <span>Open Access · CC BY 4.0</span>
           </div>
-          <div className="text-xs text-slate-500">© {new Date().getFullYear()} TradMed International. All rights reserved.</div>
+          <div className="text-xs text-slate-500">© {new Date().getFullYear()} Mind Meditate Resources. All rights reserved.</div>
         </div>
       </footer>
     </div>
