@@ -672,6 +672,28 @@ export const getRelatedPapers = async (paperId, limit = 8) => {
   return scored.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, safeLimit);
 };
 
+// ── Cited-by (within TMI) ─────────────────────────────────────────────────────
+// Returns papers in this database whose references list contains the DOI of
+// the given paper — i.e. papers that cite it.
+export const getCitedByPapers = async (paperId) => {
+  const Paper = getPaperModel();
+  const paper = await Paper.findById(paperId).select('doi title').lean();
+  if (!paper) throw { status: 404, message: 'Paper not found' };
+  if (!paper.doi) return [];
+
+  // Escape the DOI for use in a regex
+  const escDoi = paper.doi.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const citingPapers = await Paper.find({
+    _id: { $ne: paper._id },
+    references: { $elemMatch: { $regex: escDoi, $options: 'i' } },
+  })
+    .select('_id title authors publicationYear doi')
+    .limit(20)
+    .lean();
+
+  return citingPapers;
+};
+
 // Named exports for unit testing
 export { jaccardSimilarity, normalizeTitle };
 
@@ -681,4 +703,5 @@ export default {
   ingestOpenAlexBatch,
   getPaperGraph,
   getRelatedPapers,
+  getCitedByPapers,
 };

@@ -5,6 +5,70 @@ import { Paper } from '../types';
 import { useAuthStore } from '../utils/authStore';
 
 type ViewMode = 'abstract' | 'fulltext' | 'pdf';
+type CiteFmt = 'apa' | 'vancouver' | 'bibtex' | 'ris';
+
+function fmtDate(d: string | Date | undefined, opts?: Intl.DateTimeFormatOptions) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-GB', opts ?? { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function buildCitations(paper: Paper, publisherDisplay: string) {
+  const authors = paper.authors ?? [];
+  const year = paper.publicationYear || (paper.publishedAt ? new Date(paper.publishedAt).getFullYear() : 'n.d.');
+  const doi = paper.doi ?? '';
+  const doiUrl = doi ? `https://doi.org/${doi}` : '';
+  const journal = publisherDisplay;
+  const vol = paper.volume;
+  const iss = paper.issue;
+  const seq = paper.articleSequence;
+  // e.g. "1(5)" or just the journal name if no volume
+  const volIss = vol ? (iss ? `${vol}(${iss})` : `${vol}`) : '';
+  const artRef = seq ? `Article ${seq}` : '';
+
+  // APA
+  const apaAuthors = authors.map((a) => {
+    const parts = a.name.trim().split(/\s+/);
+    const last = parts[0];
+    const initials = parts.slice(1).map((p) => p[0] + '.').join(' ');
+    return initials ? `${last}, ${initials}` : last;
+  }).join(', ');
+  const apaVolPart = volIss ? `, ${volIss}${artRef ? `, ${artRef}` : ''}` : '';
+  const apa = `${apaAuthors} (${year}). ${paper.title}. ${journal}${apaVolPart}${doi ? `. ${doiUrl}` : ''}.`;
+
+  // Vancouver
+  const vanAuthors = authors.map((a) => {
+    const parts = a.name.trim().split(/\s+/);
+    const last = parts[0];
+    const initials = parts.slice(1).map((p) => p[0]).join('');
+    return `${last} ${initials}`;
+  }).join(', ');
+  const vanVolPart = volIss ? `;${volIss}${seq ? `:e${seq}` : ''}` : '';
+  const vancouver = `${vanAuthors}. ${paper.title}. ${journal}. ${year}${vanVolPart}${doi ? `. doi: ${doi}` : ''}.`;
+
+  // BibTeX
+  const bibKey = `${(authors[0]?.name.split(/\s+/)[0] ?? 'unknown').toLowerCase()}${year}`;
+  const bibAuthors = authors.map((a) => {
+    const parts = a.name.trim().split(/\s+/);
+    return parts.length > 1 ? `${parts[0]}, ${parts.slice(1).join(' ')}` : parts[0];
+  }).join(' and ');
+  const bibtex = `@article{${bibKey},\n  title   = {${paper.title}},\n  author  = {${bibAuthors}},\n  journal = {${journal}},\n  year    = {${year}}${vol ? `,\n  volume  = {${vol}}` : ''}${iss ? `,\n  number  = {${iss}}` : ''}${seq ? `,\n  pages   = {e${seq}}` : ''}${doi ? `,\n  doi     = {${doi}}` : ''}${paper.articleNumber ? `,\n  note    = {${paper.articleNumber}}` : ''}\n}`;
+
+  // RIS
+  const risAuthors = authors.map((a) => `AU  - ${a.name}`).join('\n');
+  const ris = `TY  - JOUR\nTI  - ${paper.title}\n${risAuthors}\nJO  - ${journal}\nPY  - ${year}${vol ? `\nVL  - ${vol}` : ''}${iss ? `\nIS  - ${iss}` : ''}${seq ? `\nSP  - e${seq}` : ''}${doi ? `\nDO  - ${doi}\nUR  - ${doiUrl}` : ''}${paper.keywords?.length ? '\n' + paper.keywords.map((k) => `KW  - ${k}`).join('\n') : ''}\nER  -`;
+
+  return { apa, vancouver, bibtex, ris };
+}
+
+function downloadFile(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function PaperViewPage() {
   const { id } = useParams();
@@ -12,7 +76,9 @@ export default function PaperViewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('abstract');
+  const [citeFmt, setCiteFmt] = useState<CiteFmt>('apa');
   const [citationCopied, setCitationCopied] = useState(false);
+  const [citedBy, setCitedBy] = useState<Paper[]>([]);
   const user = useAuthStore((state) => state.user);
   const isGuest = !user;
 
@@ -21,6 +87,8 @@ export default function PaperViewPage() {
       try {
         const data = await paperAPI.getById(String(id));
         setPaper(data);
+        // Fire-and-forget cited-by (non-blocking)
+        paperAPI.getCitedBy(String(id)).then(setCitedBy).catch(() => {});
       } catch (err) {
         setError('Paper not found or may have been removed.');
       } finally {
@@ -55,8 +123,8 @@ export default function PaperViewPage() {
 
   const isOurPublication = paper.sourceProvenance?.some((p) => p.source === 'manual');
   const publisherDisplay = isOurPublication
-    ? 'TradMed International'
-    : paper.journal?.publisher || paper.journal?.name || 'TradMed International';
+    ? 'Traditional Medicine International'
+    : paper.journal?.publisher || paper.journal?.name || 'Traditional Medicine International';
 
   // Deduplicate affiliations
   const affiliations: string[] = [];
@@ -64,28 +132,25 @@ export default function PaperViewPage() {
     if (a.affiliation && !affiliations.includes(a.affiliation)) affiliations.push(a.affiliation);
   });
 
-  const authorStr = paper.authors?.map((a) => a.name).join(', ') || '';
   const year = paper.publicationYear || (paper.publishedAt ? new Date(paper.publishedAt).getFullYear() : '');
   const doi = paper.doi;
   const doiUrl = doi ? `https://doi.org/${doi}` : '';
-  const apaCitation = `${authorStr}. (${year}). ${paper.title}. ${publisherDisplay}${doi ? `. https://doi.org/${doi}` : ''}.`;
+  const pubDateStr = fmtDate(paper.publishedAt) || (year ? String(year) : '');
+  const receivedDateStr = fmtDate(paper.receivedAt);
+  const acceptedDateStr = fmtDate(paper.acceptedAt);
+  const articleType = paper.documentType || paper.topics?.[0] || 'Research Article';
+  const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+
+  const citations = buildCitations(paper, publisherDisplay);
+  const activeCitation = citations[citeFmt];
 
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCitationCopied(true);
       setTimeout(() => setCitationCopied(false), 2000);
-    } catch {
-      // clipboard not available
-    }
+    } catch { /* clipboard not available */ }
   };
-
-  const articleType = paper.topics?.[0] || 'Research Article';
-  const pubDateStr = paper.publishedAt
-    ? new Date(paper.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-    : paper.publicationYear
-    ? String(paper.publicationYear)
-    : '';
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans">
@@ -94,7 +159,7 @@ export default function PaperViewPage() {
         <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
             <Link to="/papers" className="flex items-center gap-2">
-              <span className="text-lg font-bold text-indigo-700">TradMed International</span>
+                  <span className="text-lg font-bold text-indigo-700">Traditional Medicine International</span>
             </Link>
             <div className="flex items-center gap-4">
               <Link to="/about" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">About</Link>
@@ -300,6 +365,43 @@ export default function PaperViewPage() {
                   </section>
                 )}
 
+                {/* Corresponding Author */}
+                {paper.correspondingAuthor?.name && (
+                  <section className="border-t border-gray-100 pt-6">
+                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Corresponding Author</h2>
+                    <p className="text-sm text-gray-800 font-medium">{paper.correspondingAuthor.name}</p>
+                    {paper.correspondingAuthor.email && (
+                      <a href={`mailto:${paper.correspondingAuthor.email}`} className="text-xs text-indigo-600 hover:underline">
+                        {paper.correspondingAuthor.email}
+                      </a>
+                    )}
+                  </section>
+                )}
+
+                {/* Funding */}
+                {paper.fundingStatement && (
+                  <section className="border-t border-gray-100 pt-6">
+                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Funding</h2>
+                    <p className="text-sm text-gray-700 leading-relaxed">{paper.fundingStatement}</p>
+                  </section>
+                )}
+
+                {/* Conflict of Interest */}
+                {paper.conflictOfInterest && (
+                  <section className="border-t border-gray-100 pt-6">
+                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Conflict of Interest</h2>
+                    <p className="text-sm text-gray-700 leading-relaxed">{paper.conflictOfInterest}</p>
+                  </section>
+                )}
+
+                {/* Data Availability */}
+                {paper.dataAvailability && (
+                  <section className="border-t border-gray-100 pt-6">
+                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Data Availability Statement</h2>
+                    <p className="text-sm text-gray-700 leading-relaxed">{paper.dataAvailability}</p>
+                  </section>
+                )}
+
                 {/* References — numbered list if captured, count otherwise */}
                 {(paper.references?.length > 0 || paper.referencesCount > 0) && (
                   <section className="border-t border-gray-100 pt-6">
@@ -349,7 +451,7 @@ export default function PaperViewPage() {
                 {/* Publisher attribution */}
                 {isOurPublication && (
                   <div className="flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-2">
-                    <span className="font-bold">TradMed International</span>
+                    <span className="font-bold">Traditional Medicine International</span>
                     <span className="text-indigo-400">·</span>
                     <span>Open Access · Peer Reviewed · CC BY 4.0</span>
                   </div>
@@ -414,7 +516,7 @@ export default function PaperViewPage() {
                 {/* Branded PDF header */}
                 <div className="bg-indigo-700 px-6 py-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-white">TradMed International</span>
+                    <span className="text-sm font-bold text-white">Traditional Medicine International</span>
                     <span className="text-xs text-indigo-300">·</span>
                     <span className="text-xs text-indigo-200 truncate max-w-xs">{paper.title}</span>
                   </div>
@@ -504,14 +606,81 @@ export default function PaperViewPage() {
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4">Article Information</h3>
               <dl className="space-y-3 text-sm">
-                {pubDateStr && (
+                {paper.documentType && (
                   <div>
-                    <dt className="text-[10px] uppercase tracking-widest text-gray-400 mb-0.5">Published</dt>
-                    <dd className="text-gray-800 font-medium">{pubDateStr}</dd>
+                    <dt className="text-[10px] uppercase tracking-widest text-gray-400 mb-0.5">Document Type</dt>
+                    <dd className="text-gray-800 font-medium">{paper.documentType}</dd>
+                  </div>
+                )}
+                {paper.language && (
+                  <div>
+                    <dt className="text-[10px] uppercase tracking-widest text-gray-400 mb-0.5">Language</dt>
+                    <dd className="text-gray-800">{paper.language}</dd>
+                  </div>
+                )}
+                {paper.articleNumber && (
+                  <div>
+                    <dt className="text-[10px] uppercase tracking-widest text-gray-400 mb-0.5">Article Number</dt>
+                    <dd className="font-mono text-xs text-gray-700">{paper.articleNumber}</dd>
+                  </div>
+                )}
+                {/* Volume / Issue / Article sequence */}
+                {paper.volume && (
+                  <div className="border-t border-gray-100 pt-3">
+                    <dt className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Published In</dt>
+                    <dd className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 text-xs">Volume</span>
+                        <span className="text-gray-800 font-semibold">{paper.volume}</span>
+                      </div>
+                      {paper.issue && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 text-xs">Issue</span>
+                          <span className="text-gray-800 font-semibold">
+                            {paper.issue}&nbsp;
+                            <span className="text-gray-400 font-normal text-xs">
+                              ({new Date(0, paper.issue - 1).toLocaleString('en', { month: 'short' })} {paper.publicationYear})
+                            </span>
+                          </span>
+                        </div>
+                      )}
+                      {paper.articleSequence && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500 text-xs">Article</span>
+                          <span className="text-gray-800 font-semibold">{paper.articleSequence}</span>
+                        </div>
+                      )}
+                    </dd>
+                  </div>
+                )}
+                {/* Dates timeline */}
+                {(receivedDateStr || acceptedDateStr || pubDateStr) && (
+                  <div className="border-t border-gray-100 pt-3">
+                    <dt className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Dates</dt>
+                    <dd className="space-y-1.5">
+                      {receivedDateStr && (
+                        <div className="flex items-start gap-2 text-xs">
+                          <span className="mt-0.5 w-2 h-2 rounded-full bg-gray-300 shrink-0" />
+                          <div><span className="text-gray-400">Received</span><br /><span className="text-gray-700 font-medium">{receivedDateStr}</span></div>
+                        </div>
+                      )}
+                      {acceptedDateStr && (
+                        <div className="flex items-start gap-2 text-xs">
+                          <span className="mt-0.5 w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                          <div><span className="text-gray-400">Accepted</span><br /><span className="text-gray-700 font-medium">{acceptedDateStr}</span></div>
+                        </div>
+                      )}
+                      {pubDateStr && (
+                        <div className="flex items-start gap-2 text-xs">
+                          <span className="mt-0.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                          <div><span className="text-gray-400">Published</span><br /><span className="text-gray-700 font-medium">{pubDateStr}</span></div>
+                        </div>
+                      )}
+                    </dd>
                   </div>
                 )}
                 {doi && (
-                  <div>
+                  <div className="border-t border-gray-100 pt-3">
                     <dt className="text-[10px] uppercase tracking-widest text-gray-400 mb-0.5">DOI</dt>
                     <dd>
                       <a href={doiUrl} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-indigo-600 hover:underline break-all">
@@ -520,7 +689,7 @@ export default function PaperViewPage() {
                     </dd>
                   </div>
                 )}
-                <div>
+                <div className="border-t border-gray-100 pt-3">
                   <dt className="text-[10px] uppercase tracking-widest text-gray-400 mb-0.5">Publisher</dt>
                   <dd className="text-gray-800 font-medium">{publisherDisplay}</dd>
                 </div>
@@ -557,25 +726,126 @@ export default function PaperViewPage() {
               </dl>
             </div>
 
-            {/* How to Cite */}
+            {/* Citation Network */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4">Citation Network</h3>
+              <dl className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <dt className="text-[10px] uppercase tracking-widest text-gray-400">Cited By</dt>
+                  <dd className="text-gray-800 font-semibold">{citedBy.length}</dd>
+                </div>
+                <div className="flex items-center justify-between">
+                  <dt className="text-[10px] uppercase tracking-widest text-gray-400">References</dt>
+                  <dd className="text-gray-800 font-semibold">{paper.references?.length || paper.referencesCount || 0}</dd>
+                </div>
+              </dl>
+              {citedBy.length > 0 && (
+                <div className="mt-4">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
+                      Used in Traditional Medicine International
+                    </span>
+                  </div>
+                  <ul className="space-y-2">
+                    {citedBy.map((cp) => (
+                      <li key={String(cp._id)} className="text-xs">
+                        <a
+                          href={`/papers/${cp._id}`}
+                          className="text-indigo-600 hover:underline line-clamp-2 leading-snug"
+                        >
+                          {cp.title}
+                        </a>
+                        {cp.publicationYear && (
+                          <span className="text-gray-400 ml-1">({cp.publicationYear})</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* How to Cite — multi-format */}
             {(doi || paper.authors?.length > 0) && (
               <div className="bg-white border border-gray-200 rounded-xl p-5">
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">How to Cite</h3>
-                <p className="text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 leading-relaxed font-mono select-all break-words">
-                  {apaCitation}
-                </p>
-                <button
-                  onClick={() => copyToClipboard(apaCitation)}
-                  className="mt-2 w-full text-xs font-medium text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition flex items-center justify-center gap-1.5"
-                >
-                  {citationCopied ? (
-                    <><span className="text-emerald-600">✓</span> Copied!</>
-                  ) : (
-                    <>⧉ Copy Citation</>
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Cite This Article</h3>
+                {/* Format tabs */}
+                <div className="flex gap-1 mb-3 bg-gray-100 rounded-lg p-0.5">
+                  {(['apa', 'vancouver', 'bibtex', 'ris'] as CiteFmt[]).map((fmt) => (
+                    <button
+                      key={fmt}
+                      onClick={() => setCiteFmt(fmt)}
+                      className={`flex-1 text-[10px] font-bold uppercase py-1.5 rounded-md transition-colors ${
+                        citeFmt === fmt ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {fmt === 'bibtex' ? 'BibTeX' : fmt === 'ris' ? 'RIS' : fmt.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+                <pre className="text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3 leading-relaxed select-all break-words whitespace-pre-wrap font-mono max-h-40 overflow-y-auto">
+                  {activeCitation}
+                </pre>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => copyToClipboard(activeCitation)}
+                    className="flex-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition flex items-center justify-center gap-1.5"
+                  >
+                    {citationCopied ? <><span className="text-emerald-600">✓</span> Copied!</> : <>⧉ Copy</>}
+                  </button>
+                  {citeFmt === 'ris' && (
+                    <button
+                      onClick={() => downloadFile(activeCitation, `${paper._id}.ris`, 'application/x-research-info-systems')}
+                      className="flex-1 text-xs font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg px-3 py-2 hover:bg-indigo-100 transition flex items-center justify-center gap-1.5"
+                    >
+                      ↓ .ris
+                    </button>
                   )}
-                </button>
+                  {citeFmt === 'bibtex' && (
+                    <button
+                      onClick={() => downloadFile(activeCitation, `${paper._id}.bib`, 'text/x-bibtex')}
+                      className="flex-1 text-xs font-medium text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg px-3 py-2 hover:bg-indigo-100 transition flex items-center justify-center gap-1.5"
+                    >
+                      ↓ .bib
+                    </button>
+                  )}
+                </div>
               </div>
             )}
+
+            {/* Share */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Share</h3>
+              <div className="flex gap-2">
+                <a
+                  href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(paper.title)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition text-gray-700"
+                >
+                  𝕏
+                </a>
+                <a
+                  href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(pageUrl)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition text-gray-700"
+                >
+                  in
+                </a>
+                <a
+                  href={`mailto:?subject=${encodeURIComponent(paper.title)}&body=${encodeURIComponent(`I thought you'd find this article interesting:\n\n${paper.title}\n\n${pageUrl}`)}`}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition text-gray-700"
+                >
+                  ✉
+                </a>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(pageUrl); }}
+                  className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition text-gray-700"
+                  title="Copy link"
+                >
+                  🔗
+                </button>
+              </div>
+            </div>
 
             {/* Open Access / License */}
             {paper.isOpenAccess && (
@@ -601,7 +871,7 @@ export default function PaperViewPage() {
             {/* Guest CTA */}
             {isGuest && (
               <div className="bg-indigo-600 text-white rounded-xl p-5">
-                <h3 className="text-sm font-bold mb-1">Publish with TradMed International</h3>
+                <h3 className="text-sm font-bold mb-1">Publish with Traditional Medicine International</h3>
                 <p className="text-xs text-indigo-200 mb-4 leading-relaxed">
                   Submit your traditional or integrative medicine research to our open-access peer-reviewed platform.
                 </p>
@@ -617,6 +887,22 @@ export default function PaperViewPage() {
 
         </div>
       </div>
+
+      {/* ── Footer (guests only — sidebar provides footer when logged in) ── */}
+      {isGuest && (
+        <footer className="bg-slate-900 text-slate-400 text-sm mt-10">
+          <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <span className="font-bold text-white">Traditional Medicine International</span>
+            <div className="flex gap-5 text-xs">
+              <Link to="/about" className="hover:text-white">About</Link>
+              <Link to="/editorial-board" className="hover:text-white">Editorial Board</Link>
+              <Link to="/journal-policy" className="hover:text-white">Journal Policy</Link>
+              <Link to="/papers" className="hover:text-white">Papers</Link>
+            </div>
+            <span className="text-xs text-slate-500">© {new Date().getFullYear()} Mind Meditate Resources. All rights reserved.</span>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

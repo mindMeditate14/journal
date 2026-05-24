@@ -1549,7 +1549,7 @@ export async function publishManuscript(req, res, next) {
           publishedAt: manuscript.publishedAt,
           publicationYear: new Date(manuscript.publishedAt).getFullYear(),
           journal: {
-            name: manuscript.journalId?.title || 'TradMed International',
+            name: manuscript.journalId?.title || 'Traditional Medicine International',
           },
           sourceProvenance: [
             {
@@ -1563,6 +1563,25 @@ export async function publishManuscript(req, res, next) {
           topics: manuscript.metadata?.sectionHeadings || [],
           isOpenAccess: true,
           qualityScore: 80,
+          language: 'English',
+          documentType: manuscript.discipline
+            ? manuscript.discipline.trim()
+            : 'Research Article',
+          articleNumber: `TMI-${new Date(manuscript.publishedAt).getFullYear()}-${String(manuscript._id).slice(-4).toUpperCase()}`,
+          receivedAt: manuscript.submittedAt || null,
+          acceptedAt: manuscript.acceptedAt || null,
+          correspondingAuthor: manuscript.metadata?.correspondingAuthor?.name
+            ? {
+                name: manuscript.metadata.correspondingAuthor.name,
+                email: manuscript.metadata.correspondingAuthor.email || '',
+              }
+            : undefined,
+          fundingStatement: manuscript.fundingStatement || '',
+          conflictOfInterest: manuscript.conflictOfInterest || '',
+          dataAvailability: manuscript.dataAvailability || '',
+          volume,
+          issue,
+          articleSequence,
           body: manuscript.body || manuscript.content || '',
           sections: (manuscript.sections || []).map(s => ({
             title: s.title || '',
@@ -1582,6 +1601,26 @@ export async function publishManuscript(req, res, next) {
         const filter = manuscript.doi
           ? { doi: manuscript.doi.toLowerCase().trim() }
           : { 'sourceProvenance.sourceId': manuscript._id.toString() };
+        // Volume / Issue / Article sequence — assign only once (idempotent on retry)
+        const TMI_FOUNDING_YEAR = 2026; // Volume 1 = 2026
+        const pubDate = new Date(manuscript.publishedAt);
+        const volume = pubDate.getFullYear() - TMI_FOUNDING_YEAR + 1;
+        const issue  = pubDate.getMonth() + 1; // 1–12
+
+        // Check if paper already exists with a sequence number (retry guard)
+        const existingPaper = await Paper.findOne(filter).select('volume issue articleSequence').lean();
+        let articleSequence;
+        if (existingPaper?.articleSequence) {
+          // Keep original assignment if re-publishing
+          articleSequence = existingPaper.articleSequence;
+        } else {
+          // Count papers already in this volume+issue (excluding this paper if it pre-exists)
+          const seqQuery = existingPaper
+            ? { volume, issue, _id: { $ne: existingPaper._id } }
+            : { volume, issue };
+          articleSequence = (await Paper.countDocuments(seqQuery)) + 1;
+        }
+
         const result = await Paper.findOneAndUpdate(
           filter,
           { $set: { ...paperDoc, doi: manuscript.doi ? manuscript.doi.toLowerCase().trim() : undefined } },
@@ -1677,11 +1716,11 @@ async function sendSubmissionConfirmationEmail(email, authorName, submissionId, 
   const htmlContent = `
     <h2>Manuscript Submission Received</h2>
     <p>Dear ${authorName},</p>
-    <p>Thank you for submitting your manuscript to <strong>TradMed International</strong>.</p>
+    <p>Thank you for submitting your manuscript to <strong>Traditional Medicine International</strong>.</p>
     <p><strong>Submission ID:</strong> ${submissionId}</p>
     <p><strong>Title:</strong> ${title}</p>
     <p>Your manuscript has been received and will be reviewed by our editorial team within 5-7 business days. You can track the status of your submission at any time by logging into your account.</p>
-    <p>Best regards,<br/>TradMed International Editorial Team</p>
+    <p>Best regards,<br/>Traditional Medicine International Editorial Team</p>
   `;
 
   await emailService.send({
@@ -1708,7 +1747,7 @@ async function sendReviewerInvitations(manuscript, reviewerIds) {
       html: `
         <h2>Peer Review Invitation</h2>
         <p>Dear ${name},</p>
-        <p>You have been invited to review the following manuscript for TradMed International:</p>
+        <p>You have been invited to review the following manuscript for Traditional Medicine International:</p>
         <p><strong>Title:</strong> ${manuscript.title}</p>
         <p><strong>Authors:</strong> ${manuscript.authors.map(a => a.name).join(', ')}</p>
         <p><strong>Abstract:</strong><br/>${manuscript.abstract.substring(0, 400)}...</p>

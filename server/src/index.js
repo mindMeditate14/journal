@@ -110,7 +110,7 @@ app.get('/papers/:id', async (req, res, next) => {
     const paper = await Paper.findById(req.params.id).lean();
     if (!paper) return res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
     const metaTags = buildMetaTags(paper);
-    const title = `${paper.title} | ${paper.journal?.name || 'TradMed International'}`;
+    const title = `${paper.title} | ${paper.journal?.name || 'Traditional Medicine International'}`;
     const html = indexHtml
       .replace(/<title>[^<]*<\/title>/, `<title>${escape(title)}</title>`)
       .replace('</head>', `    ${metaTags}\n  </head>`);

@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+﻿import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../utils/authStore';
 import { Menu, LogOut, Search, Home, Plus, Shield } from 'lucide-react';
 import { useState } from 'react';
@@ -34,7 +34,7 @@ export default function Layout() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-indigo-600">TradMed International</h1>
+            <h1 className="text-2xl font-bold text-indigo-600">Traditional Medicine International</h1>
           </div>
 
           <nav className="hidden md:flex items-center gap-6">

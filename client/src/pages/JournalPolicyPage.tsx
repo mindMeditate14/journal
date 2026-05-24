@@ -1,38 +1,42 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
+import { useAuthStore } from '../utils/authStore';
 
 export default function JournalPolicyPage() {
+  const user = useAuthStore((state) => state.user);
   const year = new Date().getFullYear();
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      {/* ── Nav ── */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-          <Link to="/papers" className="text-lg font-bold text-indigo-700 tracking-tight">
-            TradMed International
-          </Link>
-          <nav className="flex items-center gap-5 text-sm font-medium text-gray-600">
-            <Link to="/about" className="hover:text-indigo-700">About</Link>
-            <Link to="/editorial-board" className="hover:text-indigo-700">Editorial Board</Link>
-            <Link to="/journal-policy" className="text-indigo-700 font-semibold">Journal Policy</Link>
-            <Link to="/papers" className="hover:text-indigo-700">Papers</Link>
-            <Link to="/register" className="bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition text-xs font-semibold">
-              Submit Research
+      {/* ── Nav (guests only — sidebar replaces this when logged in) ── */}
+      {!user && (
+        <header className="bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+            <Link to="/papers" className="text-lg font-bold text-indigo-700 tracking-tight">
+              Traditional Medicine International
             </Link>
-          </nav>
-        </div>
-      </header>
+            <nav className="flex items-center gap-5 text-sm font-medium text-gray-600">
+              <Link to="/about" className="hover:text-indigo-700">About</Link>
+              <Link to="/editorial-board" className="hover:text-indigo-700">Editorial Board</Link>
+              <Link to="/journal-policy" className="text-indigo-700 font-semibold">Journal Policy</Link>
+              <Link to="/papers" className="hover:text-indigo-700">Papers</Link>
+              <Link to="/register" className="bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition text-xs font-semibold">
+                Submit Research
+              </Link>
+            </nav>
+          </div>
+        </header>
+      )}
 
       {/* ── Hero ── */}
       <section className="bg-gradient-to-br from-indigo-900 to-violet-900 text-white">
         <div className="max-w-5xl mx-auto px-6 py-14">
           <div className="text-xs font-semibold uppercase tracking-widest bg-white/10 border border-white/20 px-3 py-1 rounded-full inline-block mb-4">
-            TradMed International
+            Traditional Medicine International
           </div>
           <h1 className="text-4xl md:text-5xl font-extrabold mb-4">Journal Policy</h1>
           <p className="text-indigo-200 text-lg max-w-2xl leading-relaxed">
             Publication ethics, copyright, open access licence, and publishing policies
-            of TradMed International.
+            of Traditional Medicine International.
           </p>
         </div>
       </section>
@@ -48,7 +52,7 @@ export default function JournalPolicyPage() {
             <table className="w-full text-sm">
               <tbody>
                 {[
-                  ['Journal Title', 'TradMed International'],
+                  ['Journal Title', 'Traditional Medicine International'],
                   ['Publisher', 'Mind Meditate Resources'],
                   ['Publisher Address', 'H-07-03, Jalan Blok H, Pusat Komersial Dataran Ecohill, Jalan Ecohill 1/2, Semenyih, 43500 Semenyih, Selangor, Malaysia'],
                   ['Country of Publication', 'Malaysia'],
@@ -77,7 +81,7 @@ export default function JournalPolicyPage() {
           </h2>
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 space-y-3 text-gray-700 text-sm leading-relaxed">
             <p>
-              TradMed International is a fully <strong>open-access journal</strong>. All articles are freely
+              Traditional Medicine International is a fully <strong>open-access journal</strong>. All articles are freely
               available online immediately upon publication, without any subscription fee or access barrier.
             </p>
             <p>
@@ -87,7 +91,7 @@ export default function JournalPolicyPage() {
               texts of articles, provided appropriate credit is given to the original authors and source.
             </p>
             <p>
-              TradMed International charges <strong>no Article Processing Charges (APC)</strong>. There are no
+              Traditional Medicine International charges <strong>no Article Processing Charges (APC)</strong>. There are no
               submission fees, no publication fees, and no access fees to authors or readers.
             </p>
             <div className="flex items-center gap-3 mt-2">
@@ -110,8 +114,8 @@ export default function JournalPolicyPage() {
           </h2>
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-sm text-gray-700 leading-relaxed space-y-3">
             <p>
-              Authors who publish in TradMed International <strong>retain copyright</strong> of their work.
-              By submitting an article, authors grant TradMed International the right to publish, reproduce,
+              Authors who publish in Traditional Medicine International <strong>retain copyright</strong> of their work.
+              By submitting an article, authors grant Traditional Medicine International the right to publish, reproduce,
               and distribute the article under the CC BY 4.0 open-access licence.
             </p>
             <p>
@@ -143,7 +147,7 @@ export default function JournalPolicyPage() {
               reviewer recommendations.
             </p>
             <p>
-              TradMed International follows the publication ethics guidelines of the{' '}
+              Traditional Medicine International follows the publication ethics guidelines of the{' '}
               <strong>Committee on Publication Ethics (COPE)</strong>. Plagiarism, data fabrication, and
               duplicate submission constitute grounds for immediate rejection and retraction.
             </p>
@@ -201,7 +205,7 @@ export default function JournalPolicyPage() {
           </h2>
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-sm text-gray-700 leading-relaxed">
             <p>
-              Names and email addresses submitted to TradMed International are used exclusively for the stated
+              Names and email addresses submitted to Traditional Medicine International are used exclusively for the stated
               purposes of this journal and will not be made available for any other purpose or shared with
               any third party, in accordance with Malaysia's Personal Data Protection Act 2010 (PDPA).
             </p>
@@ -210,19 +214,21 @@ export default function JournalPolicyPage() {
 
       </div>
 
-      {/* ── Footer ── */}
-      <footer className="bg-slate-900 text-slate-400 text-sm mt-10">
-        <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <span className="font-bold text-white">TradMed International</span>
-          <div className="flex gap-5 text-xs">
-            <Link to="/about" className="hover:text-white">About</Link>
-            <Link to="/editorial-board" className="hover:text-white">Editorial Board</Link>
-            <Link to="/journal-policy" className="hover:text-white">Journal Policy</Link>
-            <Link to="/papers" className="hover:text-white">Papers</Link>
+      {/* ── Footer (guests only — sidebar provides footer when logged in) ── */}
+      {!user && (
+        <footer className="bg-slate-900 text-slate-400 text-sm mt-10">
+          <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <span className="font-bold text-white">Traditional Medicine International</span>
+            <div className="flex gap-5 text-xs">
+              <Link to="/about" className="hover:text-white">About</Link>
+              <Link to="/editorial-board" className="hover:text-white">Editorial Board</Link>
+              <Link to="/journal-policy" className="hover:text-white">Journal Policy</Link>
+              <Link to="/papers" className="hover:text-white">Papers</Link>
+            </div>
+            <span className="text-xs text-slate-500">© {year} Mind Meditate Resources. All rights reserved.</span>
           </div>
-          <span className="text-xs text-slate-500">© {year} Mind Meditate Resources. All rights reserved.</span>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }

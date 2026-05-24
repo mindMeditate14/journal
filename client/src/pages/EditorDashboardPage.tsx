@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import apiClient from '../api/client';
 
@@ -240,7 +240,7 @@ export function EditorDashboardPage() {
     const air = selectedManuscript?.aiReviewReport;
     if (!air || air.status !== 'done') return;
 
-    const journalName = selectedManuscript.journalId?.title || 'TradMed International';
+    const journalName = selectedManuscript.journalId?.title || 'Traditional Medicine International';
     const manuscriptTitle = selectedManuscript.title || 'Untitled';
     const generatedAt = air.generatedAt ? new Date(air.generatedAt).toLocaleString() : new Date().toLocaleString();
     const recLabel: Record<string, string> = {

@@ -1,0 +1,686 @@
+{
+  "categories": [
+    { "id": "comparison", "label": "Comparing Groups", "color": "blue" },
+    { "id": "relationship", "label": "Exploring Relationships", "color": "green" },
+    { "id": "prediction", "label": "Predicting Outcomes", "color": "purple" },
+    { "id": "reliability", "label": "Reliability Testing", "color": "amber" },
+    { "id": "validity", "label": "Validity Testing", "color": "rose" },
+    { "id": "normality", "label": "Checking Assumptions", "color": "slate" },
+    { "id": "descriptive", "label": "Describing Data", "color": "teal" }
+  ],
+  "tests": [
+    {
+      "id": "descriptive-stats",
+      "name": "Descriptive Statistics",
+      "altName": "Summary Statistics",
+      "category": "descriptive",
+      "tier": 1,
+      "tierLabel": "Beginner",
+      "purpose": "Summarises the basic features of your data — always run this first.",
+      "whenToUse": "Run before any other analysis. Describes your sample (mean age, gender distribution, score ranges) and helps you spot missing data or unusual values.",
+      "dataType": "Any type of data",
+      "minSampleSize": 1,
+      "assumptions": [],
+      "tradMedExample": "Describing 120 study participants: mean age 38.5 ± 12.3 years, 55% female, mean pain VAS score 4.2 ± 1.8.",
+      "spssPath": "Analyze → Descriptive Statistics → Descriptives (for means) or Frequencies (for categories)",
+      "keyOutputs": [
+        { "name": "Mean / SD", "meaning": "Average value and spread (for normally distributed continuous data)" },
+        { "name": "Median / IQR", "meaning": "Middle value and spread (for Likert scales or skewed data)" },
+        { "name": "Frequency (%)", "meaning": "How many participants fall in each category" },
+        { "name": "Min / Max", "meaning": "Range — quickly spots data entry errors" }
+      ],
+      "interpretationNote": "For Likert-scale data, always report median and IQR, not mean and SD. Always report N for each variable.",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["descriptive", "beginner", "first-step", "summary"]
+    },
+    {
+      "id": "shapiro-wilk",
+      "name": "Shapiro–Wilk Normality Test",
+      "altName": "SW Test",
+      "category": "normality",
+      "tier": 1,
+      "tierLabel": "Beginner",
+      "purpose": "Tests whether your data is normally distributed — tells you which type of test to use.",
+      "whenToUse": "Run this before choosing between parametric (T-Test, ANOVA) and non-parametric tests. Use Shapiro–Wilk for n < 50; use Kolmogorov–Smirnov for larger samples. Also inspect histograms and Q-Q plots — do not rely on the p-value alone.",
+      "dataType": "Continuous data",
+      "minSampleSize": 3,
+      "assumptions": [],
+      "tradMedExample": "Testing whether wellness scores of 35 Siddha therapy patients are normally distributed before deciding to use Independent T-Test or Mann–Whitney U.",
+      "spssPath": "Analyze → Descriptive Statistics → Explore → Plots: tick 'Normality plots with tests'",
+      "keyOutputs": [
+        { "name": "p-value (Sig.)", "meaning": "p > 0.05 → data is normally distributed → safe to use parametric tests. p < 0.05 → data is NOT normal → use non-parametric tests." }
+      ],
+      "interpretationNote": "For n > 30, parametric tests are generally robust to mild non-normality due to the Central Limit Theorem. Always inspect the histogram shape alongside.",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["normality", "assumption-check", "first-step", "decision"]
+    },
+    {
+      "id": "independent-t-test",
+      "name": "Independent Samples T-Test",
+      "altName": "Two-Sample T-Test",
+      "category": "comparison",
+      "tier": 1,
+      "tierLabel": "Beginner",
+      "purpose": "Compares the mean scores of two separate, unrelated groups.",
+      "whenToUse": "Use when you have two independent groups (different people in each) and a continuous outcome. Example: treatment group vs. control group. Each participant belongs to only one group.",
+      "dataType": "Continuous (interval/ratio) outcome variable; categorical grouping variable with 2 levels",
+      "minSampleSize": 20,
+      "assumptions": [
+        "Data is approximately normally distributed in each group",
+        "Groups are independent (different participants in each group)",
+        "Variances are roughly equal — check with Levene's Test",
+        "Recommended n ≥ 20 per group"
+      ],
+      "tradMedExample": "Comparing mean pain VAS scores between patients receiving Siddha herbal treatment (n=40) vs. placebo group (n=40) after 4 weeks.",
+      "spssPath": "Analyze → Compare Means → Independent Samples T-Test",
+      "keyOutputs": [
+        { "name": "t-statistic", "meaning": "Size of the difference relative to data variability" },
+        { "name": "p-value (Sig. 2-tailed)", "meaning": "p < 0.05 → the difference between groups is statistically significant" },
+        { "name": "Mean Difference", "meaning": "The actual numerical gap between the two group averages" },
+        { "name": "95% CI", "meaning": "Range within which the true mean difference falls" }
+      ],
+      "interpretationNote": "Check Levene's Test first: if p > 0.05, use the 'Equal variances assumed' row; if p < 0.05, use 'Equal variances NOT assumed'. Always report effect size (Cohen's d).",
+      "nonParametricAlt": "mann-whitney-u",
+      "parametricVersion": null,
+      "tags": ["comparison", "two-groups", "independent", "parametric", "beginner"]
+    },
+    {
+      "id": "paired-t-test",
+      "name": "Paired Samples T-Test",
+      "altName": "Dependent T-Test / Pre–Post T-Test",
+      "category": "comparison",
+      "tier": 1,
+      "tierLabel": "Beginner",
+      "purpose": "Compares scores from the same participants at two time points (pre vs. post).",
+      "whenToUse": "Use when the SAME participants are measured twice — typically before and after an intervention. Each person contributes two data points.",
+      "dataType": "Continuous data — same participants measured at two time points",
+      "minSampleSize": 15,
+      "assumptions": [
+        "The SAME participants are measured at both time points",
+        "The differences between pairs are approximately normally distributed",
+        "No extreme outliers in the difference scores"
+      ],
+      "tradMedExample": "Measuring blood glucose levels in the same 30 patients before and after 8 weeks of Ayurvedic treatment.",
+      "spssPath": "Analyze → Compare Means → Paired Samples T-Test",
+      "keyOutputs": [
+        { "name": "t-statistic", "meaning": "Magnitude of the pre–post change" },
+        { "name": "p-value (Sig. 2-tailed)", "meaning": "p < 0.05 → there is a statistically significant change after treatment" },
+        { "name": "Mean Difference", "meaning": "Average change from pre to post (positive = increase, negative = decrease)" }
+      ],
+      "interpretationNote": "Report the direction of change (improved or worsened) and the mean difference. Always report effect size (Cohen's d).",
+      "nonParametricAlt": "wilcoxon",
+      "parametricVersion": null,
+      "tags": ["comparison", "pre-post", "paired", "repeated-measures", "parametric", "beginner"]
+    },
+    {
+      "id": "one-way-anova",
+      "name": "One-Way ANOVA",
+      "altName": "Analysis of Variance",
+      "category": "comparison",
+      "tier": 1,
+      "tierLabel": "Beginner",
+      "purpose": "Compares mean scores across three or more independent groups simultaneously.",
+      "whenToUse": "Use when comparing 3+ independent groups on a continuous outcome. A significant ANOVA only tells you differences EXIST — always follow with post-hoc tests (Tukey or Bonferroni) to find WHICH groups differ.",
+      "dataType": "Continuous outcome variable; categorical grouping variable with 3+ levels",
+      "minSampleSize": 20,
+      "assumptions": [
+        "Data is approximately normally distributed in each group",
+        "Groups are independent",
+        "Variances are roughly equal across groups (Levene's Test p > 0.05)",
+        "No significant outliers"
+      ],
+      "tradMedExample": "Comparing quality-of-life scores across three groups: TCM treatment, Ayurvedic treatment, and no-treatment control.",
+      "spssPath": "Analyze → Compare Means → One-Way ANOVA → Post Hoc: Tukey or Bonferroni → Options: tick Descriptive + Homogeneity of variance",
+      "keyOutputs": [
+        { "name": "F-statistic", "meaning": "Overall test of whether any group differs" },
+        { "name": "p-value (Sig.)", "meaning": "p < 0.05 → at least one group is significantly different from another" },
+        { "name": "Post-hoc tests (Tukey/Bonferroni)", "meaning": "Shows WHICH specific pairs of groups differ significantly" },
+        { "name": "η² (Eta-squared)", "meaning": "Effect size: 0.01 = small, 0.06 = medium, 0.14 = large" }
+      ],
+      "interpretationNote": "A significant F does NOT tell you where the differences are — always run post-hoc tests. Report η² as effect size.",
+      "nonParametricAlt": "kruskal-wallis",
+      "parametricVersion": null,
+      "tags": ["comparison", "three-groups", "independent", "parametric", "anova", "beginner"]
+    },
+    {
+      "id": "mann-whitney-u",
+      "name": "Mann–Whitney U Test",
+      "altName": "Wilcoxon Rank-Sum Test",
+      "category": "comparison",
+      "tier": 2,
+      "tierLabel": "Intermediate",
+      "purpose": "Non-parametric alternative to the Independent T-Test for non-normal or ordinal data.",
+      "whenToUse": "Use when comparing two independent groups but your data is NOT normally distributed, is ordinal (Likert scales), or your sample is small. Compares medians by ranking all scores together.",
+      "dataType": "Ordinal or continuous data when normality assumption is not met",
+      "minSampleSize": 10,
+      "assumptions": [
+        "Data is at least ordinal",
+        "Groups are independent",
+        "Same distribution shape in both groups (for interpreting median differences)"
+      ],
+      "tradMedExample": "Comparing median patient-rated improvement scores between herbal treatment and placebo groups when pain scores are skewed or sample is small (n < 30).",
+      "spssPath": "Analyze → Nonparametric Tests → Legacy Dialogs → 2 Independent Samples → select Mann–Whitney U",
+      "keyOutputs": [
+        { "name": "U-statistic", "meaning": "The test statistic" },
+        { "name": "p-value (Asymp. Sig.)", "meaning": "p < 0.05 → the two groups are significantly different" },
+        { "name": "Median", "meaning": "Report median and IQR (not mean and SD) for non-parametric tests" }
+      ],
+      "interpretationNote": "Report as: 'Mann–Whitney U test indicated a significant difference between groups, U = X, p = .003.' Always report medians with IQR.",
+      "nonParametricAlt": null,
+      "parametricVersion": "independent-t-test",
+      "tags": ["comparison", "two-groups", "non-parametric", "ordinal", "small-sample", "intermediate"]
+    },
+    {
+      "id": "wilcoxon",
+      "name": "Wilcoxon Signed-Rank Test",
+      "altName": "Wilcoxon Matched-Pairs Test",
+      "category": "comparison",
+      "tier": 2,
+      "tierLabel": "Intermediate",
+      "purpose": "Non-parametric alternative to the Paired T-Test for pre–post data that is not normally distributed.",
+      "whenToUse": "Use when the SAME participants are measured twice but data is not normal, is ordinal, or sample is small (n < 30).",
+      "dataType": "Ordinal or continuous paired data when normality is not met",
+      "minSampleSize": 10,
+      "assumptions": [
+        "Same participants measured at two time points",
+        "Data is at least ordinal",
+        "The differences between pairs are symmetrically distributed"
+      ],
+      "tradMedExample": "Comparing symptom severity in the same 20 patients before and after Siddha detoxification therapy when sample size is small.",
+      "spssPath": "Analyze → Nonparametric Tests → Legacy Dialogs → 2 Related Samples → Wilcoxon",
+      "keyOutputs": [
+        { "name": "Z-statistic", "meaning": "The standardised test statistic" },
+        { "name": "p-value (Asymp. Sig.)", "meaning": "p < 0.05 → significant pre–post change occurred" }
+      ],
+      "interpretationNote": "Report medians with IQR for both time points. Use this when n < 30 or normality is violated for paired data.",
+      "nonParametricAlt": null,
+      "parametricVersion": "paired-t-test",
+      "tags": ["comparison", "pre-post", "non-parametric", "paired", "intermediate"]
+    },
+    {
+      "id": "kruskal-wallis",
+      "name": "Kruskal–Wallis Test",
+      "altName": "Kruskal–Wallis H Test",
+      "category": "comparison",
+      "tier": 2,
+      "tierLabel": "Intermediate",
+      "purpose": "Non-parametric alternative to One-Way ANOVA for comparing 3+ groups with non-normal or ordinal data.",
+      "whenToUse": "Use when comparing three or more independent groups and data is not normally distributed or is ordinal. Follow with pairwise Mann–Whitney U tests using Bonferroni correction.",
+      "dataType": "Ordinal or non-normal continuous data across 3+ independent groups",
+      "minSampleSize": 10,
+      "assumptions": [
+        "Data is at least ordinal",
+        "Groups are independent",
+        "Each group has at least 5 participants"
+      ],
+      "tradMedExample": "Comparing patient satisfaction Likert scores (1–5) across three TCM clinics when scores are skewed.",
+      "spssPath": "Analyze → Nonparametric Tests → Legacy Dialogs → K Independent Samples → Kruskal–Wallis H",
+      "keyOutputs": [
+        { "name": "H-statistic (Chi-Square in output)", "meaning": "The overall test statistic" },
+        { "name": "p-value (Asymp. Sig.)", "meaning": "p < 0.05 → at least one group differs from another" }
+      ],
+      "interpretationNote": "Follow with pairwise Mann–Whitney U tests (Bonferroni-corrected) to find which groups differ. Report median and IQR per group.",
+      "nonParametricAlt": null,
+      "parametricVersion": "one-way-anova",
+      "tags": ["comparison", "three-groups", "non-parametric", "ordinal", "intermediate"]
+    },
+    {
+      "id": "pearson-correlation",
+      "name": "Pearson Correlation",
+      "altName": "Pearson's r",
+      "category": "relationship",
+      "tier": 1,
+      "tierLabel": "Beginner",
+      "purpose": "Measures the strength and direction of the linear relationship between two continuous variables.",
+      "whenToUse": "Use when both variables are continuous and normally distributed, and you want to know if they are related. Result (r) ranges from −1 to +1.",
+      "dataType": "Two continuous variables, both approximately normally distributed",
+      "minSampleSize": 30,
+      "assumptions": [
+        "Both variables are continuous (interval or ratio scale)",
+        "Both variables are approximately normally distributed",
+        "A linear relationship exists between the variables",
+        "No extreme outliers"
+      ],
+      "tradMedExample": "Examining the relationship between number of Ayurvedic treatment sessions attended and improvement in wellness scores.",
+      "spssPath": "Analyze → Correlate → Bivariate → tick Pearson",
+      "keyOutputs": [
+        { "name": "r (correlation coefficient)", "meaning": "Strength and direction: +1 = perfect positive, −1 = perfect negative, 0 = no relationship. Strength guide: < 0.20 = very weak, 0.20–0.39 = weak, 0.40–0.59 = moderate, 0.60–0.79 = strong, ≥ 0.80 = very strong." },
+        { "name": "p-value (Sig.)", "meaning": "p < 0.05 → the relationship is statistically significant" },
+        { "name": "r² (square of r)", "meaning": "% of shared variance. E.g., r = 0.60 → r² = 0.36 → 36% shared variance." }
+      ],
+      "interpretationNote": "Correlation does NOT imply causation. Always report both r and p-value. Use Spearman for Likert-scale data.",
+      "nonParametricAlt": "spearman-correlation",
+      "parametricVersion": null,
+      "tags": ["relationship", "correlation", "continuous", "parametric", "beginner"]
+    },
+    {
+      "id": "spearman-correlation",
+      "name": "Spearman Rank Correlation",
+      "altName": "Spearman's ρ (rho)",
+      "category": "relationship",
+      "tier": 2,
+      "tierLabel": "Intermediate",
+      "purpose": "Non-parametric measure of monotonic relationship between two ordinal or non-normal variables.",
+      "whenToUse": "Use when variables are ordinal (Likert scales), not normally distributed, or contain outliers. Very common in health and social science research with questionnaire data.",
+      "dataType": "Ordinal or continuous non-normal variables",
+      "minSampleSize": 20,
+      "assumptions": [
+        "Variables are at least ordinal",
+        "A monotonic relationship exists (as one variable increases, the other consistently increases or decreases)"
+      ],
+      "tradMedExample": "Examining the relationship between patient-rated symptom severity (1–10) and quality-of-life scores after herbal therapy.",
+      "spssPath": "Analyze → Correlate → Bivariate → tick Spearman",
+      "keyOutputs": [
+        { "name": "ρ (rho)", "meaning": "Strength and direction of relationship (−1 to +1) — interpreted the same way as Pearson's r" },
+        { "name": "p-value (Sig.)", "meaning": "p < 0.05 → statistically significant relationship" }
+      ],
+      "interpretationNote": "The safer choice for any Likert-scale data. Interpretation of strength is identical to Pearson's r.",
+      "nonParametricAlt": null,
+      "parametricVersion": "pearson-correlation",
+      "tags": ["relationship", "correlation", "non-parametric", "ordinal", "likert", "intermediate"]
+    },
+    {
+      "id": "chi-square",
+      "name": "Chi-Square Test of Independence",
+      "altName": "χ² Test",
+      "category": "relationship",
+      "tier": 1,
+      "tierLabel": "Beginner",
+      "purpose": "Tests whether two categorical variables are associated or independent of each other.",
+      "whenToUse": "Use when BOTH variables are categorical. Example: Is there an association between treatment type (herbal/conventional) and treatment outcome (improved/not improved)?",
+      "dataType": "Two categorical variables (nominal or ordinal)",
+      "minSampleSize": 20,
+      "assumptions": [
+        "Both variables are categorical",
+        "Expected frequency in each cell must be ≥ 5 (if not, use Fisher's Exact Test)",
+        "Each participant is counted only once",
+        "Random or representative sampling"
+      ],
+      "tradMedExample": "Testing whether gender (male/female) is associated with treatment preference (TCM / Ayurveda / Conventional) in 200 clinic visitors.",
+      "spssPath": "Analyze → Descriptive Statistics → Crosstabs → Statistics: tick Chi-Square and Phi & Cramer's V",
+      "keyOutputs": [
+        { "name": "χ² (Chi-Square value)", "meaning": "The test statistic" },
+        { "name": "p-value (Asymp. Sig.)", "meaning": "p < 0.05 → a statistically significant association exists between the two variables" },
+        { "name": "Cramér's V", "meaning": "Effect size: 0.10 = small, 0.30 = medium, 0.50 = large association" }
+      ],
+      "interpretationNote": "Always report Cramér's V as the effect size. If any expected cell count is < 5, use Fisher's Exact Test instead (available in same SPSS dialog).",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["relationship", "categorical", "association", "chi-square", "beginner"]
+    },
+    {
+      "id": "linear-regression",
+      "name": "Multiple Linear Regression",
+      "altName": "OLS Regression",
+      "category": "prediction",
+      "tier": 2,
+      "tierLabel": "Intermediate",
+      "purpose": "Predicts a continuous outcome from one or more predictor variables and identifies their relative contributions.",
+      "whenToUse": "Use when you want to know which factors best predict a continuous outcome, and by how much. Requires a larger sample (rule of thumb: 10–20 participants per predictor).",
+      "dataType": "Continuous outcome variable; continuous or dummy-coded categorical predictors",
+      "minSampleSize": 50,
+      "assumptions": [
+        "Linear relationship between each predictor and the outcome",
+        "Residuals are approximately normally distributed",
+        "No multicollinearity (VIF < 10 for all predictors)",
+        "Homoscedasticity (equal variance of residuals across predicted values)",
+        "Recommended: 10–20 participants per predictor variable"
+      ],
+      "tradMedExample": "Predicting patient wellness scores from number of treatment sessions, treatment type (dummy-coded), and patient age in a TCM intervention study.",
+      "spssPath": "Analyze → Regression → Linear → Enter method (or Stepwise for exploratory) → Statistics: tick Collinearity diagnostics",
+      "keyOutputs": [
+        { "name": "R² (R-squared)", "meaning": "How much variance in the outcome is explained by all predictors combined. E.g., R² = 0.42 → 42% explained." },
+        { "name": "β (Standardised Beta)", "meaning": "Relative contribution of each predictor — higher |β| = stronger predictor" },
+        { "name": "p-value for each predictor", "meaning": "p < 0.05 → that predictor significantly contributes to the model" },
+        { "name": "VIF", "meaning": "Variance Inflation Factor — VIF > 10 indicates problematic multicollinearity" }
+      ],
+      "interpretationNote": "Report Adjusted R² (more conservative than R²) when you have multiple predictors. Report β and p for each significant predictor.",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["prediction", "regression", "continuous", "multiple-variables", "intermediate"]
+    },
+    {
+      "id": "logistic-regression",
+      "name": "Binary Logistic Regression",
+      "altName": "Logistic Regression",
+      "category": "prediction",
+      "tier": 3,
+      "tierLabel": "Advanced",
+      "purpose": "Predicts the probability of a binary (yes/no) outcome from one or more predictor variables.",
+      "whenToUse": "Use when your outcome variable has only two categories — e.g., treatment response (yes/no), disease relapse (yes/no), treatment adherence (compliant/non-compliant).",
+      "dataType": "Binary outcome (0/1 or yes/no); any type of predictor variables",
+      "minSampleSize": 50,
+      "assumptions": [
+        "Outcome variable is binary (two categories only)",
+        "Observations are independent",
+        "No extreme multicollinearity among predictors",
+        "Recommended: at least 10 events per predictor variable"
+      ],
+      "tradMedExample": "Predicting likelihood of symptom remission (yes/no) based on treatment type, dosage, and patient age in an Ayurvedic clinical study.",
+      "spssPath": "Analyze → Regression → Binary Logistic",
+      "keyOutputs": [
+        { "name": "Exp(B) / Odds Ratio (OR)", "meaning": "How much the odds of the outcome change per unit increase in the predictor. OR > 1 = increased odds; OR < 1 = decreased odds." },
+        { "name": "Nagelkerke R²", "meaning": "Pseudo R-squared — approximation of explained variance" },
+        { "name": "Hosmer–Lemeshow p-value", "meaning": "Should be p > 0.05 to indicate good model fit" },
+        { "name": "Classification Table", "meaning": "Overall percentage of correct predictions" }
+      ],
+      "interpretationNote": "Always report 95% Confidence Interval for Exp(B). An OR of 1.0 means no effect; report whether the CI excludes 1.0.",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["prediction", "binary", "classification", "advanced"]
+    },
+    {
+      "id": "cronbach-alpha",
+      "name": "Cronbach's Alpha",
+      "altName": "Coefficient Alpha / Internal Consistency",
+      "category": "reliability",
+      "tier": 1,
+      "tierLabel": "Beginner",
+      "purpose": "Measures whether questionnaire items consistently measure the same underlying construct.",
+      "whenToUse": "Run this for every questionnaire or scale before conducting other analyses. A prerequisite for valid results. Minimum acceptable α = 0.70 for research.",
+      "dataType": "Multiple Likert-scale or rating items that measure one construct",
+      "minSampleSize": 30,
+      "assumptions": [
+        "All items measure the same single underlying construct (unidimensionality)",
+        "Items are scored in the same direction — reverse-score negatively worded items first",
+        "Items should be moderately correlated with each other"
+      ],
+      "tradMedExample": "Testing whether 10 items measuring 'perceived wellness after TCM therapy' consistently measure that construct (target α ≥ 0.70).",
+      "spssPath": "Analyze → Scale → Reliability Analysis → Model: Alpha → Statistics: tick Item, Scale if item deleted",
+      "keyOutputs": [
+        { "name": "Cronbach's Alpha (α)", "meaning": "≥ 0.90 = Excellent · 0.80–0.89 = Good · 0.70–0.79 = Acceptable · 0.60–0.69 = Questionable · < 0.60 = Poor (unacceptable for research)" },
+        { "name": "CITC (Corrected Item-Total Correlation)", "meaning": "How well each item correlates with the overall scale. Target ≥ 0.30. Items < 0.20 should be reviewed for removal." },
+        { "name": "Alpha if Item Deleted", "meaning": "If deleting an item raises α substantially, consider removing that item." }
+      ],
+      "interpretationNote": "Always check CITC for each item. Never report α without also checking whether items were reverse-scored where needed.",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["reliability", "questionnaire", "internal-consistency", "beginner", "likert"]
+    },
+    {
+      "id": "test-retest",
+      "name": "Test-Retest Reliability (ICC)",
+      "altName": "Intraclass Correlation Coefficient",
+      "category": "reliability",
+      "tier": 2,
+      "tierLabel": "Intermediate",
+      "purpose": "Measures whether the questionnaire produces stable, consistent results across two administrations.",
+      "whenToUse": "Administer the same questionnaire to the same participants twice (typically 2–4 weeks apart). Use ICC to quantify stability over time. Required for instrument validation studies.",
+      "dataType": "Two sets of continuous scores from the same participants",
+      "minSampleSize": 30,
+      "assumptions": [
+        "Same participants complete the questionnaire at two time points",
+        "The interval between administrations is appropriate (typically 1–4 weeks)",
+        "The construct being measured should be stable over the test interval"
+      ],
+      "tradMedExample": "Administering a 'perceived herbal efficacy' scale to 40 patients twice, 2 weeks apart, to verify scale stability before the main study.",
+      "spssPath": "Analyze → Scale → Reliability Analysis → Intraclass Correlation Coefficient → Two-Way Mixed, Absolute Agreement",
+      "keyOutputs": [
+        { "name": "ICC value", "meaning": "≥ 0.90 = Excellent · 0.75–0.89 = Good · 0.50–0.74 = Moderate · < 0.50 = Poor" },
+        { "name": "95% Confidence Interval", "meaning": "Range within which the true ICC value falls — both bounds should be ≥ 0.70 for clinical use" }
+      ],
+      "interpretationNote": "ICC ≥ 0.75 is generally acceptable for research. For clinical measurement tools, aim for ICC ≥ 0.90.",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["reliability", "test-retest", "stability", "ICC", "intermediate"]
+    },
+    {
+      "id": "efa",
+      "name": "Exploratory Factor Analysis (EFA)",
+      "altName": "EFA",
+      "category": "validity",
+      "tier": 3,
+      "tierLabel": "Advanced",
+      "purpose": "Discovers the underlying factor structure of a set of questionnaire items when structure is not yet known.",
+      "whenToUse": "Use EFA when DEVELOPING a new questionnaire or when you have no prior theory about how items group together. Use CFA when you want to CONFIRM a previously known structure.",
+      "dataType": "Multiple Likert-scale or continuous items (typically 10–100 items)",
+      "minSampleSize": 100,
+      "assumptions": [
+        "Sample size ≥ 100 (minimum 5 participants per item)",
+        "Items are at least ordinal",
+        "Kaiser–Meyer–Olkin (KMO) ≥ 0.60 — tests sampling adequacy",
+        "Bartlett's Test of Sphericity: p < 0.05 — tests that items are correlated",
+        "No items with inter-item correlation > 0.90 (multicollinearity)"
+      ],
+      "tradMedExample": "Identifying the underlying factors (physical, mental, and spiritual wellness) in a new 30-item Traditional Medicine Wellness Scale.",
+      "spssPath": "Analyze → Dimension Reduction → Factor → Extraction: Principal Axis Factoring → Rotation: Promax (oblique) or Varimax (orthogonal) → Suppress loadings below 0.30",
+      "keyOutputs": [
+        { "name": "KMO value", "meaning": "≥ 0.80 = Good · 0.70–0.79 = Middling · 0.60–0.69 = Mediocre · < 0.60 = Unacceptable — abort EFA if < 0.60" },
+        { "name": "Bartlett's Test p-value", "meaning": "Must be p < 0.05 to confirm items are sufficiently correlated for factor analysis" },
+        { "name": "Factor Loadings", "meaning": "Strength of each item's relationship to each factor. Target: ≥ 0.40 (remove items < 0.30)" },
+        { "name": "Variance Explained (%)", "meaning": "Total variance accounted for by all retained factors. Target: ≥ 50%" },
+        { "name": "Eigenvalues", "meaning": "Values > 1.0 indicate a factor worth retaining (Kaiser criterion). Cross-check with Scree plot." }
+      ],
+      "interpretationNote": "Remove items with loadings < 0.40 or that cross-load on two factors with < 0.10 difference. Use Scree plot + parallel analysis to determine the number of factors.",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["validity", "factor-analysis", "questionnaire-development", "advanced"]
+    },
+    {
+      "id": "cfa",
+      "name": "Confirmatory Factor Analysis (CFA)",
+      "altName": "CFA",
+      "category": "validity",
+      "tier": 3,
+      "tierLabel": "Advanced",
+      "purpose": "Tests whether a predefined factor structure fits the observed data in your sample.",
+      "whenToUse": "Use CFA when you have a theoretically-derived or previously validated questionnaire and want to confirm its factor structure holds in your sample. Requires AMOS (SPSS add-on) or R (lavaan).",
+      "dataType": "Multiple Likert-scale or continuous items with a predefined factor structure",
+      "minSampleSize": 200,
+      "assumptions": [
+        "Sample size ≥ 200 (or at least 10 participants per item)",
+        "Items are approximately normally distributed",
+        "A theoretical factor structure is pre-specified before data collection",
+        "No extreme multivariate outliers"
+      ],
+      "tradMedExample": "Confirming that a previously validated 3-factor TCM Wellness Scale maintains its structure in a Malaysian sample.",
+      "spssPath": "Use IBM SPSS AMOS (add-on): Launch AMOS from SPSS, draw the factor structure path diagram, run analysis",
+      "keyOutputs": [
+        { "name": "CFI (Comparative Fit Index)", "meaning": "≥ 0.95 = good fit · ≥ 0.90 = acceptable · < 0.90 = poor fit" },
+        { "name": "RMSEA", "meaning": "≤ 0.06 = good fit · ≤ 0.08 = acceptable · > 0.10 = poor fit" },
+        { "name": "SRMR", "meaning": "≤ 0.08 = good fit" },
+        { "name": "Standardised Factor Loadings", "meaning": "Should be ≥ 0.50 for each item (ideally ≥ 0.70)" },
+        { "name": "AVE (Average Variance Extracted)", "meaning": "≥ 0.50 = acceptable convergent validity" },
+        { "name": "CR (Composite Reliability)", "meaning": "≥ 0.70 = acceptable reliability" }
+      ],
+      "interpretationNote": "Report CFI, RMSEA, and SRMR as primary fit indices. If fit is poor, inspect modification indices — but only make theoretically justifiable changes.",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["validity", "confirmatory", "SEM", "model-fit", "advanced", "AMOS"]
+    },
+    {
+      "id": "effect-size",
+      "name": "Effect Size",
+      "altName": "Cohen's d / η² / Cramér's V",
+      "category": "normality",
+      "tier": 2,
+      "tierLabel": "Intermediate",
+      "purpose": "Measures the practical significance of a finding — not just WHETHER a difference exists, but HOW BIG it is.",
+      "whenToUse": "Always report alongside p-values. A statistically significant result can still be practically trivial (especially with large samples). Most journals now require effect sizes.",
+      "dataType": "Calculated from your statistical output — not a standalone test",
+      "minSampleSize": 1,
+      "assumptions": [],
+      "tradMedExample": "Reporting that herbal treatment produced a large effect on pain reduction (Cohen's d = 0.85), not just that it was significant (p = 0.003).",
+      "spssPath": "T-Tests: SPSS reports Cohen's d in newer versions, or calculate: d = (M1–M2) ÷ pooled SD · ANOVA: η² = SS_between ÷ SS_total from output",
+      "keyOutputs": [
+        { "name": "Cohen's d (T-Tests)", "meaning": "0.20 = small · 0.50 = medium · 0.80 = large effect" },
+        { "name": "η² / partial η² (ANOVA)", "meaning": "0.01 = small · 0.06 = medium · 0.14 = large effect" },
+        { "name": "r (Correlation)", "meaning": "0.10 = small · 0.30 = medium · 0.50 = large effect" },
+        { "name": "Cramér's V (Chi-Square)", "meaning": "0.10 = small · 0.30 = medium · 0.50 = large effect" }
+      ],
+      "interpretationNote": "Always report effect size. Never only report p-values. Journals like PLOS ONE, BMC, and Frontiers require effect sizes.",
+      "nonParametricAlt": null,
+      "parametricVersion": null,
+      "tags": ["effect-size", "practical-significance", "reporting", "intermediate"]
+    }
+  ],
+  "wizardTree": {
+    "goal": {
+      "compare":     { "next": "groupCount" },
+      "relationship":{ "next": "relType" },
+      "predict":     { "next": "predType" },
+      "validate":    { "next": "valType" },
+      "describe":    { "result": ["descriptive-stats"] }
+    },
+    "groupCount": {
+      "2":  { "next": "paired" },
+      "3+": { "next": "normalGroups" }
+    },
+    "paired": {
+      "yes": { "next": "normalPaired" },
+      "no":  { "next": "normalIndep" }
+    },
+    "normalPaired": {
+      "yes": { "result": ["paired-t-test"] },
+      "no":  { "result": ["wilcoxon"] },
+      "unsure": { "result": ["wilcoxon", "paired-t-test"] }
+    },
+    "normalIndep": {
+      "yes": { "result": ["independent-t-test"] },
+      "no":  { "result": ["mann-whitney-u"] },
+      "unsure": { "result": ["mann-whitney-u", "independent-t-test"] }
+    },
+    "normalGroups": {
+      "yes": { "result": ["one-way-anova"] },
+      "no":  { "result": ["kruskal-wallis"] },
+      "unsure": { "result": ["kruskal-wallis", "one-way-anova"] }
+    },
+    "relType": {
+      "both-continuous": { "next": "normalRel" },
+      "both-categorical": { "result": ["chi-square"] },
+      "mixed": { "result": ["spearman-correlation", "chi-square"] }
+    },
+    "normalRel": {
+      "yes": { "result": ["pearson-correlation"] },
+      "no":  { "result": ["spearman-correlation"] },
+      "unsure": { "result": ["spearman-correlation", "pearson-correlation"] }
+    },
+    "predType": {
+      "continuous": { "result": ["linear-regression"] },
+      "binary":     { "result": ["logistic-regression"] }
+    },
+    "valType": {
+      "reliability": { "result": ["cronbach-alpha", "test-retest"] },
+      "factors":     { "result": ["efa", "cfa"] },
+      "full":        { "result": ["cronbach-alpha", "efa", "cfa", "test-retest"] }
+    }
+  },
+  "interpretationGuide": {
+    "p-value": {
+      "label": "p-value (Significance)",
+      "thresholds": [
+        { "max": 0.001, "level": "Highly Significant", "color": "green", "text": "Highly statistically significant (p < 0.001). The probability of observing this result by chance alone is less than 0.1%. There is very strong evidence against the null hypothesis." },
+        { "max": 0.01,  "level": "Very Significant",  "color": "green", "text": "Statistically significant (p < 0.01). Strong evidence against the null hypothesis. This result would occur by chance less than 1% of the time." },
+        { "max": 0.05,  "level": "Significant",       "color": "blue",  "text": "Statistically significant (p < 0.05). The conventional threshold for significance in most research. There is sufficient evidence to reject the null hypothesis." },
+        { "max": 0.10,  "level": "Marginal",          "color": "amber", "text": "Marginally significant (0.05 < p < 0.10). This result does not meet the conventional significance threshold. Consider it a trend — interpret with caution and do not make strong claims." },
+        { "max": 1.0,   "level": "Not Significant",   "color": "red",   "text": "Not statistically significant (p > 0.10). There is insufficient evidence to reject the null hypothesis. This does not prove the null hypothesis is true — it may reflect insufficient power." }
+      ]
+    },
+    "cronbach-alpha": {
+      "label": "Cronbach's Alpha (Internal Consistency)",
+      "thresholds": [
+        { "min": 0.90, "level": "Excellent", "color": "green", "text": "Excellent internal consistency reliability (α ≥ 0.90). The questionnaire items very consistently measure the same underlying construct." },
+        { "min": 0.80, "level": "Good",      "color": "green", "text": "Good internal consistency reliability (α = {value}). The questionnaire items consistently measure the intended construct. Acceptable for all research purposes." },
+        { "min": 0.70, "level": "Acceptable","color": "blue",  "text": "Acceptable internal consistency reliability (α = {value}). The questionnaire meets the minimum standard for research (α ≥ 0.70) and can be used in the study." },
+        { "min": 0.60, "level": "Questionable","color": "amber","text": "Questionable internal consistency (α = {value}). This falls below the 0.70 threshold. Review items with low CITC (< 0.30) and consider revising or removing them before proceeding." },
+        { "min": 0.0,  "level": "Poor",      "color": "red",   "text": "Poor internal consistency (α = {value}). The questionnaire items do not consistently measure the same construct. The scale requires substantial revision. Do not use this scale in the current form." }
+      ]
+    },
+    "pearson-r": {
+      "label": "Pearson r / Spearman ρ (Correlation Coefficient)",
+      "thresholds": [
+        { "min": 0.80,  "level": "Very Strong",  "color": "green", "text": "Very strong positive correlation (r = {value}). The two variables are very strongly related — as one increases, the other increases substantially." },
+        { "min": 0.60,  "level": "Strong",       "color": "green", "text": "Strong positive correlation (r = {value}). The two variables are strongly related. This relationship is likely practically meaningful." },
+        { "min": 0.40,  "level": "Moderate",     "color": "blue",  "text": "Moderate positive correlation (r = {value}). A meaningful relationship exists between the variables, though other factors also play a role." },
+        { "min": 0.20,  "level": "Weak",         "color": "amber", "text": "Weak positive correlation (r = {value}). A slight positive relationship exists but the association is not strong. Many other factors likely influence the outcome." },
+        { "min": 0.0,   "level": "Very Weak / None","color": "slate","text": "Very weak or no positive correlation (r = {value}). The two variables show little to no linear relationship." }
+      ]
+    },
+    "kmo": {
+      "label": "Kaiser–Meyer–Olkin (KMO) — Sampling Adequacy",
+      "thresholds": [
+        { "min": 0.90, "level": "Marvellous", "color": "green", "text": "Marvellous sampling adequacy (KMO = {value}). The data is highly suitable for factor analysis." },
+        { "min": 0.80, "level": "Good",       "color": "green", "text": "Good sampling adequacy (KMO = {value}). The data is well-suited for factor analysis." },
+        { "min": 0.70, "level": "Middling",   "color": "blue",  "text": "Middling sampling adequacy (KMO = {value}). The data is acceptable for factor analysis." },
+        { "min": 0.60, "level": "Mediocre",   "color": "amber", "text": "Mediocre sampling adequacy (KMO = {value}). Factor analysis can proceed but with caution. Consider collecting more data." },
+        { "min": 0.0,  "level": "Unacceptable","color": "red",  "text": "Unacceptable sampling adequacy (KMO = {value}). Factor analysis should NOT be conducted with this data. The items are not sufficiently correlated." }
+      ]
+    }
+  },
+  "researchChecklist": [
+    {
+      "phase": "Phase 1 — Research Design",
+      "color": "indigo",
+      "items": [
+        "Define a clear, focused research title",
+        "Write 3–5 specific research objectives",
+        "Formulate hypotheses (null and alternative) for each objective",
+        "Select an appropriate study design (cross-sectional, experimental, quasi-experimental, etc.)",
+        "Classify your variables as independent, dependent, or covariate",
+        "Determine required sample size (use G*Power — α = 0.05, power = 0.80)",
+        "Define inclusion and exclusion criteria for participants",
+        "Obtain ethics approval / institutional review board clearance",
+        "Identify the questionnaire(s) / measurement tools to be used",
+        "Check whether existing validated instruments are available before developing new ones"
+      ]
+    },
+    {
+      "phase": "Phase 2 — Data Collection",
+      "color": "blue",
+      "items": [
+        "Pilot-test questionnaire on a small sample (n = 20–30) before main study",
+        "Run Cronbach's Alpha on pilot data (target α ≥ 0.70)",
+        "Revise items with CITC < 0.30 based on pilot results",
+        "Collect data from the target sample using standardised procedure",
+        "Record how and when data was collected (for methodology section)",
+        "Ensure data entry accuracy — double-check a random sample of records",
+        "Back up your data file immediately after collection"
+      ]
+    },
+    {
+      "phase": "Phase 3 — Data Preparation",
+      "color": "cyan",
+      "items": [
+        "Check for missing data — acceptable threshold: < 5% per variable",
+        "Handle missing values (listwise deletion, mean imputation, or multiple imputation)",
+        "Identify and investigate outliers (use boxplots and z-scores > ±3)",
+        "Reverse-score all negatively worded questionnaire items",
+        "Check variable types and coding in SPSS (nominal, ordinal, scale)",
+        "Run descriptive statistics first to verify data makes sense",
+        "Test normality (Shapiro–Wilk for n < 50; Kolmogorov–Smirnov for larger samples)"
+      ]
+    },
+    {
+      "phase": "Phase 4 — Statistical Analysis",
+      "color": "violet",
+      "items": [
+        "Run and report descriptive statistics (means, SD, frequencies, percentages)",
+        "Test all statistical assumptions before running main analyses",
+        "Choose parametric tests if data is normal; non-parametric if not",
+        "Run reliability analysis (Cronbach's Alpha) for all questionnaire scales",
+        "Run all main statistical tests as specified in your research objectives",
+        "Calculate and report effect sizes (Cohen's d, η², r, Cramér's V)",
+        "Create clear, properly labelled tables for all key results",
+        "Verify all reported values match SPSS output exactly"
+      ]
+    },
+    {
+      "phase": "Phase 5 — Publication Writing",
+      "color": "rose",
+      "items": [
+        "Write Abstract: background, objective, method, results, conclusion (150–250 words)",
+        "Write Introduction: background, research gap, significance, objectives",
+        "Write Methodology: design, participants, instruments, procedure, analysis plan",
+        "Write Results: present all findings with tables and figures (no interpretation yet)",
+        "Write Discussion: interpret findings, compare with literature, explain unexpected results",
+        "Write Limitations and Conclusion",
+        "Format all references in APA 7th edition style",
+        "Review target journal's author guidelines and word limit",
+        "Check for plagiarism (target: < 15% similarity for most journals)",
+        "Have a colleague or mentor review the manuscript before submission"
+      ]
+    }
+  ]
+}

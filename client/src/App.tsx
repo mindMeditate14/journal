@@ -7,6 +7,13 @@ import ProtectedRoute from './components/ProtectedRoute';
 import ManuscriptEditPage from './pages/ManuscriptEditPage';
 import ManuscriptRevisionPage from './pages/ManuscriptRevisionPage';
 
+// Wrap public pages with sidebar when the user is logged in
+function ConditionalLayout({ children }: { children: React.ReactNode }) {
+  const user = useAuthStore((state) => state.user);
+  if (user) return <SidebarLayout>{children}</SidebarLayout>;
+  return <>{children}</>;
+}
+
 // Pages
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -29,6 +36,7 @@ import PaperViewPage from './pages/PaperViewPage';
 import AboutPage from './pages/AboutPage';
 import EditorialBoardPage from './pages/EditorialBoardPage';
 import JournalPolicyPage from './pages/JournalPolicyPage';
+import ResearchStudioPage from './pages/ResearchStudioPage';
 
 export default function App() {
   const restoreSession = useAuthStore((state) => state.restoreSession);
@@ -50,12 +58,12 @@ export default function App() {
         {/* Published Papers - Landing Page (shows sidebar if logged in) */}
         <Route path="/" element={<PublishedPapersWrapper />} />
         <Route path="/papers" element={<PublishedPapersWrapper />} />
-        <Route path="/papers/:id" element={<PaperViewPage />} />
+        <Route path="/papers/:id" element={<ConditionalLayout><PaperViewPage /></ConditionalLayout>} />
 
-        {/* Journal Info Pages */}
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/editorial-board" element={<EditorialBoardPage />} />
-        <Route path="/journal-policy" element={<JournalPolicyPage />} />
+        {/* Journal Info Pages — show sidebar when logged in */}
+        <Route path="/about" element={<ConditionalLayout><AboutPage /></ConditionalLayout>} />
+        <Route path="/editorial-board" element={<ConditionalLayout><EditorialBoardPage /></ConditionalLayout>} />
+        <Route path="/journal-policy" element={<ConditionalLayout><JournalPolicyPage /></ConditionalLayout>} />
 
         {/* Protected Routes with Sidebar */}
         <Route element={<SidebarLayout />}>
@@ -160,6 +168,14 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['reviewer', 'editor', 'admin']}>
                 <MyReviewsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/research-studio"
+            element={
+              <ProtectedRoute allowedRoles={['researcher', 'editor', 'admin']}>
+                <ResearchStudioPage />
               </ProtectedRoute>
             }
           />

@@ -31,7 +31,7 @@ async function extractPdfText(manuscript) {
   }
 }
 
-const SYSTEM_PROMPT = `You are an expert academic peer reviewer for TradMed International, a journal specialising in traditional medicine, integrative health, and ethnomedicine research. Your role is to provide a structured, impartial pre-screening review of submitted manuscripts.
+const SYSTEM_PROMPT = `You are an expert academic peer reviewer for Traditional Medicine International, a journal specialising in traditional medicine, integrative health, and ethnomedicine research. Your role is to provide a structured, impartial pre-screening review of submitted manuscripts.
 
 Evaluate the manuscript on five dimensions, each scored 1–10:
 1. Methodology — rigour, reproducibility, appropriate study design

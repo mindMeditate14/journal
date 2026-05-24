@@ -1,6 +1,6 @@
 /**
  * coverPageService.js
- * Prepends a branded TradMed International cover page to a manuscript PDF.
+ * Prepends a branded Traditional Medicine International cover page to a manuscript PDF.
  * Uses pdf-lib to create and merge pages.
  */
 
@@ -73,7 +73,7 @@ export async function buildCoverPdf(paper) {
   const pubDate = paper.publishedAt
     ? new Date(paper.publishedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     : '';
-  const journalName = paper.journal?.name || 'TradMed International';
+  const journalName = paper.journal?.name || 'Traditional Medicine International';
   const keywords = (paper.keywords || []).join(', ');
   const abstract = paper.abstract || '';
 
@@ -99,7 +99,7 @@ export async function buildCoverPdf(paper) {
   // ── Header bar ───────────────────────────────────────────────────────
   page.drawRectangle({ x: 0, y: height - 70, width, height: 70, color: indigo });
 
-  page.drawText('TradMed International', {
+  page.drawText('Traditional Medicine International', {
     x: margin, y: height - 42,
     size: 18, font: fontBold, color: white,
   });
@@ -195,7 +195,7 @@ export async function buildCoverPdf(paper) {
 
   // ── Footer ────────────────────────────────────────────────────────────
   page.drawRectangle({ x: 0, y: 0, width, height: 50, color: hex('#f5f3ff') });
-  page.drawText('© TradMed International · Open Access · This work is licensed under CC BY 4.0', {
+  page.drawText('© Traditional Medicine International · Open Access · This work is licensed under CC BY 4.0', {
     x: margin, y: 20, size: 7.5, font: fontReg, color: gray5,
   });
   if (doiUrl) {
@@ -225,8 +225,8 @@ export async function buildCoverPdf(paper) {
 
   merged.setTitle(title);
   merged.setAuthor(authors);
-  merged.setCreator('TradMed International');
-  merged.setProducer('TradMed International Journal Platform');
+  merged.setCreator('Traditional Medicine International');
+  merged.setProducer('Traditional Medicine International Journal Platform');
 
   const mergedBytes = await merged.save();
   return Buffer.from(mergedBytes);

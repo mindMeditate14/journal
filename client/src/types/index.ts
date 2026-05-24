@@ -27,9 +27,21 @@ export interface Paper {
   doi?: string;
   publicationYear?: number;
   publishedAt?: string | Date;
+  receivedAt?: string | Date;
+  acceptedAt?: string | Date;
   citationsCount: number;
   referencesCount: number;
   isOpenAccess: boolean;
+  language?: string;
+  documentType?: string;
+  articleNumber?: string;
+  correspondingAuthor?: { name: string; email?: string };
+  fundingStatement?: string;
+  conflictOfInterest?: string;
+  dataAvailability?: string;
+  volume?: number;
+  issue?: number;
+  articleSequence?: number;
   authors: Array<{
     name: string;
     affiliation?: string;

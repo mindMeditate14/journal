@@ -1,6 +1,6 @@
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+﻿import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../utils/authStore';
-import { Menu, X, Home, Search, BookOpen, Plus, Shield, LogOut, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
+import { Menu, X, Home, Search, BookOpen, Plus, Shield, LogOut, ChevronLeft, ChevronRight, ClipboardList, FlaskConical } from 'lucide-react';
 import { useState } from 'react';
 import { ReactNode } from 'react';
 import { Role } from '../types';
@@ -47,6 +47,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
   const isAdmin = hasRole('admin', user?.roles, user?.role);
   const isEditor = hasRole('editor', user?.roles, user?.role) || isAdmin;
   const isReviewer = hasRole('reviewer', user?.roles, user?.role);
+  const isResearcher = hasRole('researcher', user?.roles, user?.role) || isEditor;
 
   const handleLogout = () => {
     logout();
@@ -57,6 +58,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
     { icon: Home, label: 'Dashboard', path: '/dashboard' },
     { icon: BookOpen, label: 'Published Papers', path: '/papers' },
     { icon: Plus, label: 'Create Manuscript', path: '/manuscripts/create' },
+    ...(isResearcher ? [{ icon: FlaskConical, label: 'Research Studio', path: '/research-studio' }] : []),
     ...(isReviewer || isEditor ? [{ icon: ClipboardList, label: 'My Reviews', path: '/my-reviews' }] : []),
     ...(isEditor ? [{ icon: Shield, label: 'Editor', path: '/editor/dashboard' }] : []),
     ...(isAdmin ? [{ icon: Shield, label: 'Admin', path: '/admin' }] : []),
@@ -67,7 +69,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
       {/* Logo */}
       <div className={`p-4 border-b ${collapsed ? 'text-center' : ''}`}>
         {!collapsed && (
-          <h1 className="text-xl font-bold text-indigo-600">TradMed International</h1>
+          <h1 className="text-xl font-bold text-indigo-600">Traditional Medicine International</h1>
         )}
         {collapsed && (
           <span className="text-2xl">📚</span>
@@ -144,7 +146,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-xl">
             <div className="flex justify-between items-center p-4 border-b">
-              <h1 className="text-xl font-bold text-indigo-600">TradMed International</h1>
+              <h1 className="text-xl font-bold text-indigo-600">Traditional Medicine International</h1>
               <button onClick={() => setMobileOpen(false)} className="text-gray-500">
                 <X size={24} />
               </button>
@@ -178,7 +180,7 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header */}
         <header className="md:hidden bg-white shadow-sm p-4 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-indigo-600">TradMed International</h1>
+          <h1 className="text-lg font-bold text-indigo-600">Traditional Medicine International</h1>
           <button 
             onClick={() => setMobileOpen(true)}
             className="p-2 text-gray-600"
@@ -189,7 +191,24 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
 
         {/* Content */}
         <main className="flex-1 overflow-auto">
-          {children || <Outlet />}
+          <div className="min-h-full flex flex-col">
+            <div className="flex-1">
+              {children || <Outlet />}
+            </div>
+            {/* ── Footer ── */}
+            <footer className="bg-slate-900 text-slate-400 text-sm mt-auto">
+              <div className="px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-3">
+                <span className="font-bold text-white text-sm">Traditional Medicine International</span>
+                <div className="flex gap-5 text-xs">
+                  <a href="/about" className="hover:text-white">About</a>
+                  <a href="/editorial-board" className="hover:text-white">Editorial Board</a>
+                  <a href="/journal-policy" className="hover:text-white">Journal Policy</a>
+                  <a href="/papers" className="hover:text-white">Papers</a>
+                </div>
+                <span className="text-xs text-slate-500">© {new Date().getFullYear()} Mind Meditate Resources. All rights reserved.</span>
+              </div>
+            </footer>
+          </div>
         </main>
       </div>
     </div>

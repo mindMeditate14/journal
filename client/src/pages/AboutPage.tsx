@@ -1,25 +1,29 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
+import { useAuthStore } from '../utils/authStore';
 
 export default function AboutPage() {
+  const user = useAuthStore((state) => state.user);
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      {/* ── Nav ── */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-          <Link to="/papers" className="text-lg font-bold text-indigo-700 tracking-tight">
-            TradMed International
-          </Link>
-          <nav className="flex items-center gap-5 text-sm font-medium text-gray-600">
-            <Link to="/about" className="text-indigo-700 font-semibold">About</Link>
-            <Link to="/editorial-board" className="hover:text-indigo-700">Editorial Board</Link>
-            <Link to="/journal-policy" className="hover:text-indigo-700">Journal Policy</Link>
-            <Link to="/papers" className="hover:text-indigo-700">Papers</Link>
-            <Link to="/register" className="bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition text-xs font-semibold">
-              Submit Research
+      {/* ── Nav (guests only — sidebar replaces this when logged in) ── */}
+      {!user && (
+        <header className="bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+            <Link to="/papers" className="text-lg font-bold text-indigo-700 tracking-tight">
+              Traditional Medicine International
             </Link>
-          </nav>
-        </div>
-      </header>
+            <nav className="flex items-center gap-5 text-sm font-medium text-gray-600">
+              <Link to="/about" className="text-indigo-700 font-semibold">About</Link>
+              <Link to="/editorial-board" className="hover:text-indigo-700">Editorial Board</Link>
+              <Link to="/journal-policy" className="hover:text-indigo-700">Journal Policy</Link>
+              <Link to="/papers" className="hover:text-indigo-700">Papers</Link>
+              <Link to="/register" className="bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition text-xs font-semibold">
+                Submit Research
+              </Link>
+            </nav>
+          </div>
+        </header>
+      )}
 
       {/* ── Hero ── */}
       <section className="bg-gradient-to-br from-indigo-900 to-violet-900 text-white">
@@ -27,7 +31,7 @@ export default function AboutPage() {
           <div className="text-xs font-semibold uppercase tracking-widest bg-white/10 border border-white/20 px-3 py-1 rounded-full inline-block mb-4">
             Open Access · Peer Reviewed · Est. 2026
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-4">About TradMed International</h1>
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-4">About Traditional Medicine International</h1>
           <p className="text-indigo-200 text-lg max-w-2xl leading-relaxed">
             A global open-access academic journal dedicated to advancing evidence-based research in
             traditional, complementary, and integrative medicine.
@@ -44,7 +48,7 @@ export default function AboutPage() {
           </h2>
           <div className="prose prose-indigo max-w-none text-gray-700 leading-relaxed space-y-4">
             <p>
-              <strong>TradMed International</strong> is an online, open-access, peer-reviewed academic journal
+              <strong>Traditional Medicine International</strong> is an online, open-access, peer-reviewed academic journal
               published continuously by <strong>Mind Meditate Resources</strong>, Malaysia. The journal provides
               an international platform for the publication of original research, review articles, case studies,
               and systematic reviews in the fields of traditional, complementary, and integrative medicine.
@@ -59,7 +63,7 @@ export default function AboutPage() {
               Homeopathy), Government of India.
             </p>
             <p>
-              TradMed International welcomes submissions that contribute to the scientific understanding,
+              Traditional Medicine International welcomes submissions that contribute to the scientific understanding,
               standardisation, safety evaluation, and clinical application of traditional medicine modalities.
               The journal is committed to rigorous double-blind peer review and adheres to international
               publication ethics standards (COPE).
@@ -115,10 +119,9 @@ export default function AboutPage() {
             <table className="w-full text-sm">
               <tbody>
                 {[
-                  ['Journal Title', 'TradMed International'],
-                  ['Publisher', 'Mind Meditate Resources'],
-                  ['Publisher Address', 'H-07-03, Jalan Blok H, Pusat Komersial Dataran Ecohill, Jalan Ecohill 1/2, Semenyih, 43500 Semenyih, Selangor, Malaysia'],
+                  ['Journal Title', 'Traditional Medicine International'],
                   ['Journal Website', 'https://tradmedint.com'],
+                  ['Contact', 'editor@tradmedint.com'],
                   ['Publication Medium', 'Online (Open Access)'],
                   ['Publication Model', 'Continuous publication (articles published as accepted)'],
                   ['Article Processing Charges', 'None — fully open access, no APC'],
@@ -135,6 +138,11 @@ export default function AboutPage() {
                 ))}
               </tbody>
             </table>
+            <p className="text-xs text-gray-400 px-5 pb-4 mt-2 leading-relaxed">
+              Published by <strong className="text-gray-500">Mind Meditate Resources</strong>,
+              H-07-03, Jalan Blok H, Pusat Komersial Dataran Ecohill, Jalan Ecohill 1/2,
+              Semenyih, 43500 Semenyih, Selangor, Malaysia.
+            </p>
           </div>
         </section>
 
@@ -150,7 +158,7 @@ export default function AboutPage() {
               document, evaluate, and validate these healing traditions through rigorous research methodology.
             </p>
             <p>
-              TradMed International was founded to bridge this gap. We believe that traditional medicine deserves
+              Traditional Medicine International was founded to bridge this gap. We believe that traditional medicine deserves
               a dedicated, credible, open-access publishing platform that serves both the practitioner community
               and the global research ecosystem. By making all content freely accessible, we ensure that advances
               in traditional medicine science reach practitioners, policymakers, and patients regardless of
@@ -163,26 +171,28 @@ export default function AboutPage() {
             </p>
             <p className="not-italic font-semibold text-gray-900 mt-4">
               Ts. Dr. Sivabalan Vellasamy, Ed.D.<br />
-              <span className="font-normal text-gray-600 text-xs">Editor-in-Chief, TradMed International</span>
+              <span className="font-normal text-gray-600 text-xs">Founding Editor, Traditional Medicine International</span>
             </p>
           </div>
         </section>
 
       </div>
 
-      {/* ── Footer ── */}
-      <footer className="bg-slate-900 text-slate-400 text-sm mt-16">
-        <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <span className="font-bold text-white">TradMed International</span>
-          <div className="flex gap-5 text-xs">
-            <Link to="/about" className="hover:text-white">About</Link>
-            <Link to="/editorial-board" className="hover:text-white">Editorial Board</Link>
-            <Link to="/journal-policy" className="hover:text-white">Journal Policy</Link>
-            <Link to="/papers" className="hover:text-white">Papers</Link>
+      {/* ── Footer (guests only — sidebar provides footer when logged in) ── */}
+      {!user && (
+        <footer className="bg-slate-900 text-slate-400 text-sm mt-16">
+          <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <span className="font-bold text-white">Traditional Medicine International</span>
+            <div className="flex gap-5 text-xs">
+              <Link to="/about" className="hover:text-white">About</Link>
+              <Link to="/editorial-board" className="hover:text-white">Editorial Board</Link>
+              <Link to="/journal-policy" className="hover:text-white">Journal Policy</Link>
+              <Link to="/papers" className="hover:text-white">Papers</Link>
+            </div>
+            <span className="text-xs text-slate-500">© {new Date().getFullYear()} Mind Meditate Resources. All rights reserved.</span>
           </div>
-          <span className="text-xs text-slate-500">© {new Date().getFullYear()} Mind Meditate Resources. All rights reserved.</span>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }

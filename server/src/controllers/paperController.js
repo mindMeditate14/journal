@@ -3,6 +3,7 @@ import {
   getPaperGraph,
   getRelatedPapers,
   searchPapers,
+  getCitedByPapers,
 } from '../services/paperService.js';
 import { buildCoverPdf } from '../utils/coverPageService.js';
 
@@ -65,9 +66,21 @@ export const download = async (req, res, next) => {
     const safeTitle = (paper.title || 'paper').replace(/[^a-z0-9]/gi, '_').substring(0, 60);
     const pdfBuffer = await buildCoverPdf(paper);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="TradMed_${safeTitle}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="TMI_${safeTitle}.pdf"`);
     res.setHeader('Content-Length', pdfBuffer.length);
     res.end(pdfBuffer);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    next(error);
+  }
+};
+
+export const getCitedBy = async (req, res, next) => {
+  try {
+    const papers = await getCitedByPapers(req.params.id);
+    res.json({ citedBy: papers });
   } catch (error) {
     if (error.status) {
       return res.status(error.status).json({ error: error.message });

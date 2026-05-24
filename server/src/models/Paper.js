@@ -74,6 +74,23 @@ const paperSchema = new mongoose.Schema(
       default: [],
     },
     references: { type: [String], default: [] },
+    // Academic credibility fields — populated from manuscript at publish time
+    receivedAt: Date,         // manuscript.submittedAt
+    acceptedAt: Date,         // manuscript.acceptedAt
+    language: { type: String, default: 'English' },
+    documentType: { type: String, default: 'Research Article' },
+    articleNumber: String,    // e.g. "2026-001"
+    correspondingAuthor: {
+      name: String,
+      email: String,
+    },
+    fundingStatement: String,
+    conflictOfInterest: String,
+    dataAvailability: String,
+    // Volume / Issue / Article sequence — auto-assigned at publish time
+    volume: Number,          // calendar-year-based: 2026 = Vol 1, 2027 = Vol 2 …
+    issue: Number,           // month of publication (1 = Jan … 12 = Dec)
+    articleSequence: Number, // sequential position within that volume+issue
   },
   { timestamps: true }
 );
@@ -96,4 +113,4 @@ paperSchema.index(
   }
 );
 
-export default mongoose.model('Paper', paperSchema);
+export default mongoose.model('Paper', paperSchema, 'paper');

@@ -190,6 +190,10 @@ export const paperAPI = {
     });
     return data.related;
   },
+  getCitedBy: async (id: string): Promise<Paper[]> => {
+    const { data } = await apiClient.get(`/papers/${id}/cited-by`);
+    return data.citedBy ?? [];
+  },
 };
 
 export const ingestAPI = {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PDF Export Utility with Graphs
  * Converts practice data + statistics into a formatted PDF manuscript
  * with embedded charts and graphs
@@ -352,7 +352,7 @@ export class PDFGenerator {
         </div>
 
         <div class="footer">
-          <p>This manuscript was automatically generated from practice data using TradMed International on ${new Date().toLocaleDateString()}.</p>
+          <p>This manuscript was automatically generated from practice data using Traditional Medicine International on ${new Date().toLocaleDateString()}.</p>
           <p>Please review and edit all sections before final submission to a journal.</p>
         </div>
       </div>
