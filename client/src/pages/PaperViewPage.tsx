@@ -79,6 +79,8 @@ export default function PaperViewPage() {
   const [citeFmt, setCiteFmt] = useState<CiteFmt>('apa');
   const [citationCopied, setCitationCopied] = useState(false);
   const [citedBy, setCitedBy] = useState<Paper[]>([]);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const user = useAuthStore((state) => state.user);
   const isGuest = !user;
 
@@ -97,6 +99,26 @@ export default function PaperViewPage() {
     };
     if (id) fetchPaper();
   }, [id]);
+
+  // Fetch PDF as blob when PDF tab is opened to bypass X-Frame-Options restrictions
+  useEffect(() => {
+    if (viewMode !== 'pdf' || !id || pdfBlobUrl) return;
+    setPdfLoading(true);
+    fetch(`/api/papers/${id}/download?inline=true`)
+      .then((r) => r.blob())
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        setPdfBlobUrl(url);
+      })
+      .catch(() => {})
+      .finally(() => setPdfLoading(false));
+    return () => {};
+  }, [viewMode, id]);
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => { if (pdfBlobUrl) URL.revokeObjectURL(pdfBlobUrl); };
+  }, [pdfBlobUrl]);
 
   if (loading) {
     return (
@@ -326,7 +348,8 @@ export default function PaperViewPage() {
                   Full Text (HTML)
                 </button>
               )}
-              {paper.urls?.pdf && (
+              {/* Show PDF tab for our own publications (branded cover page) or papers with a PDF url */}
+              {(isOurPublication || paper.urls?.pdf) && (
                 <button
                   onClick={() => setViewMode('pdf')}
                   className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
@@ -511,9 +534,9 @@ export default function PaperViewPage() {
             )}
 
             {/* ── PDF Viewer panel ── */}
-            {viewMode === 'pdf' && paper.urls?.pdf && (
+            {viewMode === 'pdf' && (isOurPublication || paper.urls?.pdf) && (
               <div className="bg-white border-x border-b border-gray-200 rounded-b-xl overflow-hidden">
-                {/* Branded PDF header */}
+                {/* Branded PDF header bar */}
                 <div className="bg-indigo-700 px-6 py-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-white">Traditional Medicine International</span>
@@ -531,12 +554,23 @@ export default function PaperViewPage() {
                     Download PDF
                   </a>
                 </div>
-                <iframe
-                  src={paper.urls.pdf}
-                  title={paper.title}
-                  className="w-full"
-                  style={{ height: '80vh', minHeight: 600 }}
-                />
+                {/* Show branded cover page PDF inline — blob URL bypasses X-Frame-Options */}
+                {pdfLoading && (
+                  <div className="flex items-center justify-center bg-slate-50" style={{ height: '85vh', minHeight: 700 }}>
+                    <div className="flex flex-col items-center gap-3 text-slate-500">
+                      <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-sm">Loading PDF…</span>
+                    </div>
+                  </div>
+                )}
+                {pdfBlobUrl && (
+                  <iframe
+                    src={pdfBlobUrl}
+                    title={paper.title}
+                    className="w-full"
+                    style={{ height: '85vh', minHeight: 700 }}
+                  />
+                )}
               </div>
             )}
           </main>

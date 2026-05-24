@@ -65,9 +65,21 @@ export const download = async (req, res, next) => {
     const paper = await getPaperById(req.params.id);
     const safeTitle = (paper.title || 'paper').replace(/[^a-z0-9]/gi, '_').substring(0, 60);
     const pdfBuffer = await buildCoverPdf(paper);
+    const inline = req.query.inline === 'true';
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="TMI_${safeTitle}.pdf"`);
+    res.setHeader(
+      'Content-Disposition',
+      inline
+        ? `inline; filename="TMI_${safeTitle}.pdf"`
+        : `attachment; filename="TMI_${safeTitle}.pdf"`
+    );
     res.setHeader('Content-Length', pdfBuffer.length);
+    // PDFs are binary files — CSP and framing headers are meaningless on them
+    // and interfere with Chrome's built-in PDF viewer in iframes.
+    if (inline) {
+      res.removeHeader('Content-Security-Policy');
+      res.removeHeader('X-Frame-Options');
+    }
     res.end(pdfBuffer);
   } catch (error) {
     if (error.status) {
