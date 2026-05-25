@@ -3,7 +3,7 @@ import {
   FlaskConical, BookOpen, MessageSquare, CheckSquare,
   ChevronRight, ChevronDown, ChevronUp, Search,
   AlertCircle, CheckCircle, Info, Lightbulb, ArrowLeft, Sparkles,
-  BarChart2, Loader2, RefreshCw, FileText
+  BarChart2, Loader2, RefreshCw, FileText, Download, Plus
 } from 'lucide-react';
 import {
   Chart, BarController, BarElement, CategoryScale, LinearScale,
@@ -1359,6 +1359,15 @@ interface Recommendation {
   };
 }
 
+const FIELD_CATEGORIES: { label: string; fields: string[] }[] = [
+  { label: 'Demographics', fields: ['Age', 'Gender', 'BMI', 'Weight (kg)', 'Height (cm)'] },
+  { label: 'Vital Signs', fields: ['Blood Pressure Systolic (mmHg)', 'Blood Pressure Diastolic (mmHg)', 'Heart Rate (bpm)', 'Body Temperature (°C)', 'SpO2 (%)'] },
+  { label: 'Lab Values', fields: ['Fasting Blood Glucose (mg/dL)', 'HbA1c (%)', 'Total Cholesterol (mg/dL)', 'Triglycerides (mg/dL)', 'Hemoglobin (g/dL)'] },
+  { label: 'Clinical Scores', fields: ['Pain Score (VAS 0–10)', 'Stress Score (PSS)', 'Anxiety Score (GAD-7)', 'Depression Score (PHQ-9)', 'Quality of Life Score', 'Sleep Quality Score', 'Energy Level Score', 'Symptom Severity Score'] },
+  { label: 'Study Design', fields: ['Treatment Group', 'Treatment Duration (weeks)', 'Dosage (mg)', 'Visit Number', 'Time Point'] },
+  { label: 'Traditional Medicine', fields: ['Prakruti/Constitution Type', 'Herbal Formula Dosage', 'Number of Treatment Sessions', 'Symptom Improvement (%)', 'Patient Satisfaction Score'] },
+];
+
 const CHART_COLORS = [
   'rgba(99,102,241,0.8)', 'rgba(16,185,129,0.8)', 'rgba(245,158,11,0.8)',
   'rgba(239,68,68,0.8)', 'rgba(139,92,246,0.8)', 'rgba(14,165,233,0.8)',
@@ -1590,13 +1599,75 @@ function parseNumbers(str: string): number[] {
   return str.split(/[\s,;]+/).map(Number).filter(n => !isNaN(n));
 }
 
+/** Returns true if a line looks like a CSV/TSV header (contains non-numeric cells). */
+function isHeaderLine(line: string): boolean {
+  return line.split(/[,\t]+/).some(c => c.trim() !== '' && isNaN(Number(c.trim())));
+}
+
+/** Drop the first line if it appears to be a header row. */
+function skipHeader(lines: string[]): string[] {
+  if (lines.length > 0 && isHeaderLine(lines[0])) return lines.slice(1);
+  return lines;
+}
+
+// ── CSV template generator ────────────────────────────────────────────────────
+
+function generateCsvTemplate(rec: Recommendation, fields: string[]): string {
+  const type = rec.dataInput.type;
+  const labels = rec.dataInput.labels ?? [];
+  const primary = fields[0] ?? labels[0] ?? 'Value';
+  const secondary = fields[1] ?? labels[1] ?? fields[0] ?? 'Value 2';
+  const rows: string[] = [];
+
+  if (type === 'paired') {
+    const l1 = labels[0] ?? `${primary} (Before)`;
+    const l2 = labels[1] ?? `${primary} (After)`;
+    rows.push(`${l1},${l2}`);
+    [[28,22],[31,25],[26,19],[33,28],[29,23],[35,27],[24,18],[30,24],[27,21],[32,26]].forEach(r => rows.push(r.join(',')));
+  } else if (type === 'two-groups' || type === 'multi-groups') {
+    const groupNames = labels.length >= 2 ? labels : type === 'multi-groups' ? ['Treatment A','Treatment B','Control'] : ['Treatment','Control'];
+    rows.push(`Group,${primary}`);
+    const sampleVals = [[78,82,75,90,68,85,79,88,72,83],[45,52,49,61,43,58,47,55,51,48],[62,67,71,58,65,70,64,69,66,72]];
+    groupNames.forEach((g, gi) => sampleVals[gi % sampleVals.length].forEach(v => rows.push(`${g},${v}`)));
+  } else if (type === 'correlation') {
+    rows.push(`${primary},${secondary}`);
+    [[22,110],[25,125],[28,135],[31,140],[24,115],[27,130],[30,138],[23,112],[26,128],[29,132],[32,145],[21,108]].forEach(r => rows.push(r.join(',')));
+  } else if (type === 'categories') {
+    const cols = labels.length >= 2 ? labels.slice(0,3) : ['Category A','Category B','Category C'];
+    const rLabels = ['Group 1','Group 2'];
+    rows.push(`,${cols.join(',')}`);
+    rLabels.forEach((r, ri) => rows.push(`${r},${cols.map((_,ci) => (ri===0?[28,14,8]:[12,18,20])[ci]).join(',')}` ));
+  } else if (type === 'items') {
+    const k = Math.min(Math.max(labels.length, 5), 10);
+    const itemLabels = Array.from({length: k}, (_, i) => labels[i] ?? `Item ${i+1}`);
+    rows.push(`Participant,${itemLabels.join(',')}`);
+    [[4,3,5,4,3],[5,4,5,5,4],[3,3,4,3,2],[4,4,4,5,4],[5,5,4,4,5],[2,3,3,2,3],[4,3,4,4,3],[5,4,5,4,4],[3,4,3,3,4],[4,5,4,5,4]]
+      .forEach((row, i) => rows.push(`P${String(i+1).padStart(3,'0')},${Array.from({length:k},(_,j)=>row[j%5]).join(',')}`));
+  } else {
+    const varLabels = fields.length > 0 ? fields.slice(0,4) : labels.slice(0,4).length > 0 ? labels.slice(0,4) : ['Variable 1','Variable 2'];
+    rows.push(`Participant,${varLabels.join(',')}`);
+    [[72,120,28,85],[68,118,25,82],[75,125,31,88],[80,130,35,90],[66,115,24,78],[73,122,29,84],[77,128,33,87],[70,119,27,81],[74,123,30,86],[69,117,26,80]]
+      .forEach((row, i) => rows.push(`P${String(i+1).padStart(3,'0')},${varLabels.map((_,vi)=>row[vi%row.length]).join(',')}`));
+  }
+  return rows.join('\n');
+}
+
+function downloadCsv(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function runAnalysis(raw: string, rec: Recommendation): StatResult {
   const lines = raw.trim().split('\n').map(l => l.trim()).filter(Boolean);
   const type = rec.dataInput.type;
   const labels = rec.dataInput.labels ?? [];
 
   if (type === 'paired') {
-    const pairs = lines.map(l => l.split(/[\s,]+/).map(Number));
+    const dataLines = skipHeader(lines);
+    const pairs = dataLines.map(l => l.split(/[,\t]+/).map(s => Number(s.trim())));
     const valid = pairs.filter(p => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
     if (valid.length < 3) throw new Error('Need at least 3 valid rows (before, after).');
     return runPairedTTest(valid.map(p => p[0]), valid.map(p => p[1]), labels[0] ?? 'Before', labels[1] ?? 'After');
@@ -1604,6 +1675,7 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
 
   if (type === 'two-groups' || type === 'multi-groups') {
     const groups: { name: string; values: number[] }[] = [];
+    // Try colon format first: "GroupName: v1, v2, v3"
     for (const line of lines) {
       const colonIdx = line.indexOf(':');
       if (colonIdx === -1) continue;
@@ -1611,7 +1683,21 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
       const values = parseNumbers(line.slice(colonIdx + 1));
       if (values.length > 0) groups.push({ name, values });
     }
-    if (groups.length < 2) throw new Error('Each group should be on its own line: GroupName: v1, v2, v3');
+    // Fall back to tabular format: Group,Value (one row per observation)
+    if (groups.length < 2) {
+      const dataLines = skipHeader(lines);
+      const groupMap: Record<string, number[]> = {};
+      for (const line of dataLines) {
+        const cells = line.split(/[,\t]+/);
+        if (cells.length < 2) continue;
+        const gName = cells[0].trim();
+        const val = Number(cells[1].trim());
+        if (gName && !isNaN(val)) { if (!groupMap[gName]) groupMap[gName] = []; groupMap[gName].push(val); }
+      }
+      groups.length = 0;
+      for (const [name, values] of Object.entries(groupMap)) if (values.length > 0) groups.push({ name, values });
+    }
+    if (groups.length < 2) throw new Error('Each group should be on its own line: GroupName: v1, v2, v3  — or use the downloaded template format.');
     if (groups.some(g => g.values.length < 3)) throw new Error('Each group needs at least 3 values.');
     return groups.length === 2
       ? runIndependentTTest(groups[0].values, groups[1].values, groups[0].name, groups[1].name)
@@ -1619,7 +1705,8 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
   }
 
   if (type === 'correlation') {
-    const pairs = lines.map(l => l.split(/[\s,]+/).map(Number));
+    const dataLines = skipHeader(lines);
+    const pairs = dataLines.map(l => l.split(/[,\t]+/).map(s => Number(s.trim())));
     const valid = pairs.filter(p => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
     if (valid.length < 5) throw new Error('Need at least 5 valid x, y pairs.');
     return runPearson(valid.map(p => p[0]), valid.map(p => p[1]), labels[0] ?? 'X', labels[1] ?? 'Y');
@@ -1639,7 +1726,12 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
   }
 
   if (type === 'items') {
-    const matrix = lines.map(l => parseNumbers(l));
+    const dataLines = skipHeader(lines);
+    const matrix = dataLines.map(l => {
+      const cells = l.split(/[,\t]+/).map(s => s.trim());
+      const startIdx = isNaN(Number(cells[0])) ? 1 : 0; // skip participant ID column
+      return cells.slice(startIdx).map(Number);
+    });
     const k = matrix[0]?.length ?? 0;
     const valid = matrix.filter(row => row.length === k && !row.some(isNaN));
     if (valid.length < 5 || k < 2) throw new Error('Need at least 5 participants and 2 items. Each row = one participant, columns = item scores.');
@@ -1659,7 +1751,26 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
         if (values.length > 0) vars.push({ name: 'Variable', values });
       }
     }
-    if (vars.length === 0) throw new Error('No valid data found. Format: VariableName: v1, v2, v3');
+    // Try tabular format: Participant,Var1,Var2,... (columns = variables)
+    if (vars.length === 0 || (vars.length === 1 && vars[0].name === 'Variable')) {
+      const firstCells = lines[0]?.split(/[,\t]+/).map(s => s.trim()) ?? [];
+      if (firstCells.some(c => c !== '' && isNaN(Number(c)))) {
+        const headers = firstCells;
+        const dataLines = lines.slice(1);
+        const columns: number[][] = headers.map(() => []);
+        for (const line of dataLines) {
+          const cells = line.split(/[,\t]+/).map(s => s.trim());
+          const startIdx = isNaN(Number(cells[0])) ? 1 : 0;
+          headers.forEach((_, i) => {
+            const val = Number(cells[startIdx + i]);
+            if (!isNaN(val)) columns[i].push(val);
+          });
+        }
+        vars.length = 0;
+        headers.forEach((h, i) => { if (columns[i].length > 0) vars.push({ name: h, values: columns[i] }); });
+      }
+    }
+    if (vars.length === 0) throw new Error('No valid data found. Format: VariableName: v1, v2, v3 — or use the downloaded template.');
     return runDescriptive(vars);
   }
 
