@@ -1,14 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   FlaskConical, BookOpen, MessageSquare, CheckSquare,
   ChevronRight, ChevronDown, ChevronUp, Search,
-  AlertCircle, CheckCircle, Info, Lightbulb, ArrowLeft, Sparkles
+  AlertCircle, CheckCircle, Info, Lightbulb, ArrowLeft, Sparkles,
+  BarChart2, Loader2, RefreshCw, FileText
 } from 'lucide-react';
+import {
+  Chart, BarController, BarElement, CategoryScale, LinearScale,
+  ScatterController, PointElement, LineController, LineElement,
+  Tooltip, Legend
+} from 'chart.js';
+import apiClient from '../api/client';
 import data from '../data/statisticalTests.json';
+
+Chart.register(BarController, BarElement, CategoryScale, LinearScale,
+  ScatterController, PointElement, LineController, LineElement, Tooltip, Legend);
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type Tab = 'finder' | 'library' | 'interpret' | 'checklist';
+type Tab = 'finder' | 'library' | 'interpret' | 'checklist' | 'analysis';
 
 interface Test {
   id: string;
@@ -1221,13 +1231,791 @@ function ResearchChecklist() {
   );
 }
 
+// ─── Analysis Lab ─────────────────────────────────────────────────────────────
+
+// ── Statistical math helpers ──────────────────────────────────────────────────
+
+function lnGamma(z: number): number {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091,
+    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let x = z, y = z, tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) { y++; ser += c[j] / y; }
+  return -tmp + Math.log(2.5066282746310005 * ser / x);
+}
+
+function betacf(a: number, b: number, x: number): number {
+  const FPMIN = 1e-30;
+  const qab = a + b, qap = a + 1, qam = a - 1;
+  let c = 1, d = 1 - qab * x / qap;
+  if (Math.abs(d) < FPMIN) d = FPMIN;
+  d = 1 / d; let h = d;
+  for (let m = 1; m <= 100; m++) {
+    const m2 = 2 * m;
+    let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d; h *= d * c;
+    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    d = 1 + aa * d; if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d; const del = d * c; h *= del;
+    if (Math.abs(del - 1) < 3e-7) break;
+  }
+  return h;
+}
+
+function ibeta(a: number, b: number, x: number): number {
+  if (x <= 0) return 0; if (x >= 1) return 1;
+  const bt = Math.exp(lnGamma(a + b) - lnGamma(a) - lnGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2)
+    ? bt * betacf(a, b, x) / a
+    : 1 - bt * betacf(b, a, 1 - x) / b;
+}
+
+function pFromT(t: number, df: number): number {
+  return ibeta(df / 2, 0.5, df / (df + t * t));
+}
+
+function pFromF(F: number, df1: number, df2: number): number {
+  return ibeta(df2 / 2, df1 / 2, df2 / (df2 + df1 * F));
+}
+
+function gammaSeriesP(a: number, x: number): number {
+  let ap = a, del = 1 / a, sum = del;
+  for (let n = 1; n <= 200; n++) {
+    ap++; del *= x / ap; sum += del;
+    if (Math.abs(del) < Math.abs(sum) * 3e-7) break;
+  }
+  return sum * Math.exp(-x + a * Math.log(x) - lnGamma(a));
+}
+
+function gammaCFP(a: number, x: number): number {
+  const FPMIN = 1e-30;
+  let b = x + 1 - a, c = 1 / FPMIN, d = 1 / b, h = d;
+  for (let i = 1; i <= 200; i++) {
+    const an = -i * (i - a); b += 2;
+    d = an * d + b; if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = b + an / c; if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d; const del = d * c; h *= del;
+    if (Math.abs(del - 1) < 3e-7) break;
+  }
+  return Math.exp(-x + a * Math.log(x) - lnGamma(a)) * h;
+}
+
+function gammaP(a: number, x: number): number {
+  if (x < 0) return 0; if (x === 0) return 0;
+  return x < a + 1 ? gammaSeriesP(a, x) : 1 - gammaCFP(a, x);
+}
+
+function pFromChiSq(chi2: number, df: number): number {
+  return 1 - gammaP(df / 2, chi2 / 2);
+}
+
+function mean(arr: number[]) { return arr.reduce((s, v) => s + v, 0) / arr.length; }
+function variance(arr: number[]) {
+  const m = mean(arr);
+  return arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1);
+}
+function std(arr: number[]) { return Math.sqrt(variance(arr)); }
+function median(arr: number[]) {
+  const s = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+// ── Test runner interfaces ────────────────────────────────────────────────────
+
+interface StatResult {
+  testName: string;
+  statLabel: string;
+  statValue: number;
+  pValue: number;
+  df?: string;
+  effectSize?: number;
+  effectLabel: string;
+  extraRows: [string, string][];
+  sig: boolean;
+  interpretation: string;
+  paperSentence: string;
+  chartType: 'bar' | 'scatter' | 'table' | 'none';
+  chartLabels: string[];
+  chartDatasets: { label: string; data: number[]; color: string }[];
+  scatterPoints?: { x: number; y: number }[];
+}
+
+interface Recommendation {
+  test: string;
+  testName: string;
+  rationale: string;
+  dataInput: {
+    type: 'paired' | 'two-groups' | 'multi-groups' | 'correlation' | 'categories' | 'items' | 'descriptive' | 'unsupported';
+    labels: string[];
+    instructions: string;
+    sampleSizeMin: number;
+    sampleSizeRecommended: number;
+    example: string;
+  };
+}
+
+const CHART_COLORS = [
+  'rgba(99,102,241,0.8)', 'rgba(16,185,129,0.8)', 'rgba(245,158,11,0.8)',
+  'rgba(239,68,68,0.8)', 'rgba(139,92,246,0.8)', 'rgba(14,165,233,0.8)',
+];
+
+// ── Statistical test runners ──────────────────────────────────────────────────
+
+function runPairedTTest(before: number[], after: number[], l1: string, l2: string): StatResult {
+  const n = before.length;
+  const diffs = before.map((v, i) => v - after[i]);
+  const d_bar = mean(diffs);
+  const s_d = std(diffs);
+  const t = d_bar / (s_d / Math.sqrt(n));
+  const p = pFromT(Math.abs(t), n - 1);
+  const cohenD = Math.abs(d_bar) / s_d;
+  const effectLabel = cohenD < 0.2 ? 'negligible' : cohenD < 0.5 ? 'small' : cohenD < 0.8 ? 'medium' : 'large';
+  return {
+    testName: 'Paired Samples T-Test',
+    statLabel: 't', statValue: parseFloat(t.toFixed(4)),
+    pValue: parseFloat(p.toFixed(4)), df: `${n - 1}`,
+    effectSize: parseFloat(cohenD.toFixed(3)), effectLabel: `Cohen's d = ${cohenD.toFixed(2)} (${effectLabel})`,
+    extraRows: [
+      ['Mean difference', `${d_bar.toFixed(3)} (${l1} − ${l2})`],
+      ['Std Dev of differences', s_d.toFixed(3)],
+      [`${l1} mean`, mean(before).toFixed(3)],
+      [`${l2} mean`, mean(after).toFixed(3)],
+      ['n (pairs)', `${n}`],
+    ],
+    sig: p < 0.05,
+    interpretation: p < 0.05
+      ? `There is a statistically significant difference between ${l1} and ${l2} (p = ${p.toFixed(3)}). The ${d_bar > 0 ? 'pre-treatment' : 'post-treatment'} scores were significantly higher.`
+      : `There is no statistically significant difference between ${l1} and ${l2} (p = ${p.toFixed(3)}).`,
+    paperSentence: `A paired-samples t-test indicated a ${p < 0.05 ? '' : 'non-'}significant difference between ${l1} (M = ${mean(before).toFixed(2)}, SD = ${std(before).toFixed(2)}) and ${l2} (M = ${mean(after).toFixed(2)}, SD = ${std(after).toFixed(2)}), t(${n - 1}) = ${t.toFixed(2)}, p = ${p.toFixed(3)}, Cohen's d = ${cohenD.toFixed(2)}.`,
+    chartType: 'bar',
+    chartLabels: [l1, l2],
+    chartDatasets: [{ label: 'Group Mean', data: [mean(before), mean(after)], color: CHART_COLORS[0] }],
+  };
+}
+
+function runIndependentTTest(g1: number[], g2: number[], l1: string, l2: string): StatResult {
+  const n1 = g1.length, n2 = g2.length;
+  const m1 = mean(g1), m2 = mean(g2), v1 = variance(g1), v2 = variance(g2);
+  const t = (m1 - m2) / Math.sqrt(v1 / n1 + v2 / n2);
+  const df = (v1 / n1 + v2 / n2) ** 2 / ((v1 / n1) ** 2 / (n1 - 1) + (v2 / n2) ** 2 / (n2 - 1));
+  const p = pFromT(Math.abs(t), df);
+  const sp = Math.sqrt(((n1 - 1) * v1 + (n2 - 1) * v2) / (n1 + n2 - 2));
+  const cohenD = Math.abs(m1 - m2) / sp;
+  const effectLabel = cohenD < 0.2 ? 'negligible' : cohenD < 0.5 ? 'small' : cohenD < 0.8 ? 'medium' : 'large';
+  return {
+    testName: "Independent Samples T-Test (Welch's)",
+    statLabel: 't', statValue: parseFloat(t.toFixed(4)),
+    pValue: parseFloat(p.toFixed(4)), df: `${df.toFixed(1)}`,
+    effectSize: parseFloat(cohenD.toFixed(3)), effectLabel: `Cohen's d = ${cohenD.toFixed(2)} (${effectLabel})`,
+    extraRows: [
+      [`${l1} mean ± SD`, `${m1.toFixed(3)} ± ${std(g1).toFixed(3)} (n=${n1})`],
+      [`${l2} mean ± SD`, `${m2.toFixed(3)} ± ${std(g2).toFixed(3)} (n=${n2})`],
+    ],
+    sig: p < 0.05,
+    interpretation: p < 0.05
+      ? `There is a statistically significant difference between ${l1} and ${l2} (p = ${p.toFixed(3)}).`
+      : `There is no statistically significant difference between ${l1} and ${l2} (p = ${p.toFixed(3)}).`,
+    paperSentence: `An independent-samples t-test (Welch's) revealed a ${p < 0.05 ? '' : 'non-'}significant difference between ${l1} (M = ${m1.toFixed(2)}, SD = ${std(g1).toFixed(2)}) and ${l2} (M = ${m2.toFixed(2)}, SD = ${std(g2).toFixed(2)}), t(${df.toFixed(1)}) = ${t.toFixed(2)}, p = ${p.toFixed(3)}, Cohen's d = ${cohenD.toFixed(2)}.`,
+    chartType: 'bar',
+    chartLabels: [l1, l2],
+    chartDatasets: [{ label: 'Group Mean', data: [m1, m2], color: CHART_COLORS[0] }],
+  };
+}
+
+function runANOVA(groups: { name: string; values: number[] }[]): StatResult {
+  const k = groups.length;
+  const N = groups.reduce((s, g) => s + g.values.length, 0);
+  const allVals = groups.flatMap(g => g.values);
+  const grandMean = mean(allVals);
+  const SS_between = groups.reduce((s, g) => s + g.values.length * (mean(g.values) - grandMean) ** 2, 0);
+  const SS_within = groups.reduce((s, g) => s + g.values.reduce((a, v) => a + (v - mean(g.values)) ** 2, 0), 0);
+  const df1 = k - 1, df2 = N - k;
+  const MS_b = SS_between / df1, MS_w = SS_within / df2;
+  const F = MS_b / MS_w;
+  const p = pFromF(F, df1, df2);
+  const eta2 = SS_between / (SS_between + SS_within);
+  const effectLabel = eta2 < 0.01 ? 'negligible' : eta2 < 0.06 ? 'small' : eta2 < 0.14 ? 'medium' : 'large';
+  return {
+    testName: 'One-Way ANOVA',
+    statLabel: 'F', statValue: parseFloat(F.toFixed(4)),
+    pValue: parseFloat(p.toFixed(4)), df: `${df1}, ${df2}`,
+    effectSize: parseFloat(eta2.toFixed(3)), effectLabel: `η² = ${eta2.toFixed(3)} (${effectLabel})`,
+    extraRows: [
+      ['SS between groups', SS_between.toFixed(3)],
+      ['SS within groups', SS_within.toFixed(3)],
+      ['MS between', MS_b.toFixed(3)],
+      ['MS within', MS_w.toFixed(3)],
+      ...groups.map(g => [`${g.name} M ± SD`, `${mean(g.values).toFixed(2)} ± ${std(g.values).toFixed(2)} (n=${g.values.length})`] as [string, string]),
+    ],
+    sig: p < 0.05,
+    interpretation: p < 0.05
+      ? `There is a statistically significant difference among the ${k} groups, F(${df1},${df2}) = ${F.toFixed(2)}, p = ${p.toFixed(3)}, η² = ${eta2.toFixed(3)} (${effectLabel} effect). Post-hoc tests (Tukey or Bonferroni) are recommended to identify which pairs differ.`
+      : `There is no statistically significant difference among the ${k} groups, F(${df1},${df2}) = ${F.toFixed(2)}, p = ${p.toFixed(3)}.`,
+    paperSentence: `A one-way ANOVA revealed a ${p < 0.05 ? '' : 'non-'}significant effect of group on the outcome variable, F(${df1}, ${df2}) = ${F.toFixed(2)}, p = ${p.toFixed(3)}, η² = ${eta2.toFixed(3)}.`,
+    chartType: 'bar',
+    chartLabels: groups.map(g => g.name),
+    chartDatasets: [{ label: 'Group Mean', data: groups.map(g => mean(g.values)), color: CHART_COLORS[0] }],
+  };
+}
+
+function runPearson(x: number[], y: number[], lx: string, ly: string): StatResult {
+  const n = x.length;
+  const mx = mean(x), my = mean(y);
+  const num = x.reduce((s, v, i) => s + (v - mx) * (y[i] - my), 0);
+  const den = Math.sqrt(x.reduce((s, v) => s + (v - mx) ** 2, 0) * y.reduce((s, v) => s + (v - my) ** 2, 0));
+  const r = num / den;
+  const t = r * Math.sqrt((n - 2) / (1 - r * r));
+  const p = pFromT(Math.abs(t), n - 2);
+  const r2 = r * r;
+  const effectLabel = Math.abs(r) < 0.1 ? 'negligible' : Math.abs(r) < 0.3 ? 'small' : Math.abs(r) < 0.5 ? 'medium' : 'large';
+  return {
+    testName: 'Pearson Correlation',
+    statLabel: 'r', statValue: parseFloat(r.toFixed(4)),
+    pValue: parseFloat(p.toFixed(4)), df: `${n - 2}`,
+    effectSize: parseFloat(r2.toFixed(3)), effectLabel: `r² = ${r2.toFixed(3)} (${effectLabel})`,
+    extraRows: [
+      ['Coefficient of determination (r²)', r2.toFixed(4)],
+      ['n (pairs)', `${n}`],
+    ],
+    sig: p < 0.05,
+    interpretation: p < 0.05
+      ? `There is a statistically significant ${r > 0 ? 'positive' : 'negative'} correlation between ${lx} and ${ly} (r = ${r.toFixed(3)}, p = ${p.toFixed(3)}). ${lx} ${r > 0 ? 'increases' : 'decreases'} as ${ly} ${r > 0 ? 'increases' : 'decreases'}.`
+      : `There is no statistically significant correlation between ${lx} and ${ly} (r = ${r.toFixed(3)}, p = ${p.toFixed(3)}).`,
+    paperSentence: `A Pearson correlation revealed a ${p < 0.05 ? '' : 'non-'}significant ${r > 0 ? 'positive' : 'negative'} relationship between ${lx} and ${ly}, r(${n - 2}) = ${r.toFixed(2)}, p = ${p.toFixed(3)}, r² = ${r2.toFixed(2)}.`,
+    chartType: 'scatter',
+    chartLabels: [lx, ly],
+    chartDatasets: [],
+    scatterPoints: x.map((v, i) => ({ x: v, y: y[i] })),
+  };
+}
+
+function runChiSquare(table: number[][], rowLabels: string[], colLabels: string[]): StatResult {
+  const R = table.length, C = table[0].length;
+  const rowSums = table.map(row => row.reduce((s, v) => s + v, 0));
+  const colSums = colLabels.map((_, c) => table.reduce((s, row) => s + row[c], 0));
+  const N = rowSums.reduce((s, v) => s + v, 0);
+  let chi2 = 0;
+  for (let r = 0; r < R; r++)
+    for (let c = 0; c < C; c++) {
+      const E = rowSums[r] * colSums[c] / N;
+      if (E > 0) chi2 += (table[r][c] - E) ** 2 / E;
+    }
+  const df = (R - 1) * (C - 1);
+  const p = pFromChiSq(chi2, df);
+  const cramerV = Math.sqrt(chi2 / (N * Math.min(R - 1, C - 1)));
+  const effectLabel = cramerV < 0.1 ? 'negligible' : cramerV < 0.3 ? 'small' : cramerV < 0.5 ? 'medium' : 'large';
+  return {
+    testName: 'Chi-Square Test of Independence',
+    statLabel: 'χ²', statValue: parseFloat(chi2.toFixed(4)),
+    pValue: parseFloat(p.toFixed(4)), df: `${df}`,
+    effectSize: parseFloat(cramerV.toFixed(3)), effectLabel: `Cramér's V = ${cramerV.toFixed(3)} (${effectLabel})`,
+    extraRows: [
+      ['N (total)', `${N}`],
+      ['Rows × Columns', `${R} × ${C}`],
+    ],
+    sig: p < 0.05,
+    interpretation: p < 0.05
+      ? `There is a statistically significant association between the two categorical variables, χ²(${df}) = ${chi2.toFixed(2)}, p = ${p.toFixed(3)}, Cramér's V = ${cramerV.toFixed(3)} (${effectLabel} effect).`
+      : `There is no statistically significant association between the two categorical variables, χ²(${df}) = ${chi2.toFixed(2)}, p = ${p.toFixed(3)}.`,
+    paperSentence: `A chi-square test of independence indicated a ${p < 0.05 ? '' : 'non-'}significant association between the variables, χ²(${df}, N = ${N}) = ${chi2.toFixed(2)}, p = ${p.toFixed(3)}, Cramér's V = ${cramerV.toFixed(2)}.`,
+    chartType: 'bar',
+    chartLabels: colLabels,
+    chartDatasets: table.map((row, i) => ({ label: rowLabels[i], data: row, color: CHART_COLORS[i % CHART_COLORS.length] })),
+  };
+}
+
+function runCronbach(matrix: number[][]): StatResult {
+  const n = matrix.length;
+  const k = matrix[0].length;
+  const itemVars = Array.from({ length: k }, (_, j) => variance(matrix.map(row => row[j])));
+  const totals = matrix.map(row => row.reduce((s, v) => s + v, 0));
+  const totalVar = variance(totals);
+  const sumItemVars = itemVars.reduce((s, v) => s + v, 0);
+  const alpha = (k / (k - 1)) * (1 - sumItemVars / totalVar);
+  const effectLabel = alpha < 0.5 ? 'poor' : alpha < 0.6 ? 'unacceptable' : alpha < 0.7 ? 'questionable' : alpha < 0.8 ? 'acceptable' : alpha < 0.9 ? 'good' : 'excellent';
+  return {
+    testName: "Cronbach's Alpha",
+    statLabel: 'α', statValue: parseFloat(alpha.toFixed(4)),
+    pValue: NaN, df: undefined,
+    effectSize: undefined, effectLabel: `α = ${alpha.toFixed(3)} (${effectLabel} reliability)`,
+    extraRows: [
+      ['Number of items (k)', `${k}`],
+      ['Number of participants', `${n}`],
+      ['Sum of item variances', sumItemVars.toFixed(3)],
+      ['Total score variance', totalVar.toFixed(3)],
+    ],
+    sig: alpha >= 0.7,
+    interpretation: alpha >= 0.7
+      ? `The scale has acceptable internal consistency (α = ${alpha.toFixed(3)}, ${effectLabel}). The items consistently measure the same underlying construct.`
+      : `The scale has ${effectLabel} internal consistency (α = ${alpha.toFixed(3)}). Consider revising or removing items to improve reliability.`,
+    paperSentence: `Internal consistency was assessed using Cronbach's alpha. The ${k}-item scale demonstrated ${effectLabel} reliability (α = ${alpha.toFixed(2)}).`,
+    chartType: 'bar',
+    chartLabels: Array.from({ length: k }, (_, i) => `Item ${i + 1}`),
+    chartDatasets: [{ label: 'Item Variance', data: itemVars.map(v => parseFloat(v.toFixed(3))), color: CHART_COLORS[0] }],
+  };
+}
+
+function runDescriptive(vars: { name: string; values: number[] }[]): StatResult {
+  const rows: [string, string][] = [];
+  for (const v of vars) {
+    const m = mean(v.values), s = std(v.values), med = median(v.values);
+    const sorted = [...v.values].sort((a, b) => a - b);
+    rows.push([v.name, `M=${m.toFixed(2)}, SD=${s.toFixed(2)}, Mdn=${med.toFixed(2)}, Min=${sorted[0]}, Max=${sorted[sorted.length - 1]}, n=${v.values.length}`]);
+  }
+  return {
+    testName: 'Descriptive Statistics',
+    statLabel: 'M', statValue: parseFloat(mean(vars[0].values).toFixed(4)),
+    pValue: NaN, df: undefined, effectSize: undefined, effectLabel: '',
+    extraRows: rows,
+    sig: false,
+    interpretation: `Descriptive statistics computed for ${vars.length} variable(s). See the table above for mean, standard deviation, median, and range.`,
+    paperSentence: vars.map(v => {
+      const m = mean(v.values), s = std(v.values);
+      return `${v.name}: M = ${m.toFixed(2)}, SD = ${s.toFixed(2)}, n = ${v.values.length}`;
+    }).join('; ') + '.',
+    chartType: 'bar',
+    chartLabels: vars.map(v => v.name),
+    chartDatasets: [{ label: 'Mean', data: vars.map(v => parseFloat(mean(v.values).toFixed(3))), color: CHART_COLORS[0] }],
+  };
+}
+
+// ── Data parser ───────────────────────────────────────────────────────────────
+
+function parseNumbers(str: string): number[] {
+  return str.split(/[\s,;]+/).map(Number).filter(n => !isNaN(n));
+}
+
+function runAnalysis(raw: string, rec: Recommendation): StatResult {
+  const lines = raw.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  const type = rec.dataInput.type;
+  const labels = rec.dataInput.labels ?? [];
+
+  if (type === 'paired') {
+    const pairs = lines.map(l => l.split(/[\s,]+/).map(Number));
+    const valid = pairs.filter(p => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
+    if (valid.length < 3) throw new Error('Need at least 3 valid rows (before, after).');
+    return runPairedTTest(valid.map(p => p[0]), valid.map(p => p[1]), labels[0] ?? 'Before', labels[1] ?? 'After');
+  }
+
+  if (type === 'two-groups' || type === 'multi-groups') {
+    const groups: { name: string; values: number[] }[] = [];
+    for (const line of lines) {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx === -1) continue;
+      const name = line.slice(0, colonIdx).trim();
+      const values = parseNumbers(line.slice(colonIdx + 1));
+      if (values.length > 0) groups.push({ name, values });
+    }
+    if (groups.length < 2) throw new Error('Each group should be on its own line: GroupName: v1, v2, v3');
+    if (groups.some(g => g.values.length < 3)) throw new Error('Each group needs at least 3 values.');
+    return groups.length === 2
+      ? runIndependentTTest(groups[0].values, groups[1].values, groups[0].name, groups[1].name)
+      : runANOVA(groups);
+  }
+
+  if (type === 'correlation') {
+    const pairs = lines.map(l => l.split(/[\s,]+/).map(Number));
+    const valid = pairs.filter(p => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
+    if (valid.length < 5) throw new Error('Need at least 5 valid x, y pairs.');
+    return runPearson(valid.map(p => p[0]), valid.map(p => p[1]), labels[0] ?? 'X', labels[1] ?? 'Y');
+  }
+
+  if (type === 'categories') {
+    const header = lines[0].split(',').slice(1).map(s => s.trim()).filter(Boolean);
+    const rows: { label: string; values: number[] }[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cells = lines[i].split(',');
+      const label = cells[0].trim();
+      const values = cells.slice(1).map(v => Number(v.trim()));
+      if (!values.some(isNaN) && values.length > 0) rows.push({ label, values });
+    }
+    if (rows.length < 2 || header.length < 2) throw new Error('Need at least a 2×2 table. First row = column headers, first column = row labels.');
+    return runChiSquare(rows.map(r => r.values), rows.map(r => r.label), header);
+  }
+
+  if (type === 'items') {
+    const matrix = lines.map(l => parseNumbers(l));
+    const k = matrix[0]?.length ?? 0;
+    const valid = matrix.filter(row => row.length === k && !row.some(isNaN));
+    if (valid.length < 5 || k < 2) throw new Error('Need at least 5 participants and 2 items. Each row = one participant, columns = item scores.');
+    return runCronbach(valid);
+  }
+
+  if (type === 'descriptive') {
+    const vars: { name: string; values: number[] }[] = [];
+    for (const line of lines) {
+      const colonIdx = line.indexOf(':');
+      if (colonIdx !== -1) {
+        const name = line.slice(0, colonIdx).trim();
+        const values = parseNumbers(line.slice(colonIdx + 1));
+        if (values.length > 0) vars.push({ name, values });
+      } else {
+        const values = parseNumbers(line);
+        if (values.length > 0) vars.push({ name: 'Variable', values });
+      }
+    }
+    if (vars.length === 0) throw new Error('No valid data found. Format: VariableName: v1, v2, v3');
+    return runDescriptive(vars);
+  }
+
+  throw new Error('Unsupported test type — please use SPSS for this analysis.');
+}
+
+// ── AnalysisLab Component ─────────────────────────────────────────────────────
+
+function AnalysisLab() {
+  type LabStep = 'describe' | 'data' | 'results';
+  const [step, setStep] = useState<LabStep>('describe');
+  const [question, setQuestion] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [rec, setRec] = useState<Recommendation | null>(null);
+  const [rawData, setRawData] = useState('');
+  const [parseError, setParseError] = useState('');
+  const [result, setResult] = useState<StatResult | null>(null);
+  const chartRef = useRef<HTMLCanvasElement>(null);
+  const chartInst = useRef<InstanceType<typeof Chart> | null>(null);
+
+  // Destroy chart on unmount
+  useEffect(() => () => { chartInst.current?.destroy(); }, []);
+
+  // Render chart whenever result changes
+  useEffect(() => {
+    if (!result || !chartRef.current) return;
+    chartInst.current?.destroy();
+    chartInst.current = null;
+    const ctx = chartRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (result.chartType === 'bar') {
+      chartInst.current = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: result.chartLabels,
+          datasets: result.chartDatasets.map(d => ({
+            label: d.label, data: d.data, backgroundColor: d.color, borderRadius: 6,
+          })),
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: result.chartDatasets.length > 1 } },
+          scales: { y: { beginAtZero: false } },
+        },
+      });
+    } else if (result.chartType === 'scatter' && result.scatterPoints) {
+      chartInst.current = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: `${result.chartLabels[0]} vs ${result.chartLabels[1]}`,
+            data: result.scatterPoints,
+            backgroundColor: 'rgba(99,102,241,0.6)',
+            pointRadius: 5,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { title: { display: true, text: result.chartLabels[0] ?? 'X' } },
+            y: { title: { display: true, text: result.chartLabels[1] ?? 'Y' } },
+          },
+        },
+      });
+    }
+  }, [result]);
+
+  async function handleAskAI() {
+    if (question.trim().length < 10) {
+      setAiError('Please describe your study in at least a sentence.');
+      return;
+    }
+    setAiLoading(true); setAiError('');
+    try {
+      const res = await apiClient.post('/research-ai/recommend', { question: question.trim() });
+      const data = (res as any).data ?? res;
+      setRec(data);
+      setRawData(data.dataInput?.example ?? '');
+      setStep('data');
+    } catch (e: any) {
+      const msg = e?.response?.data?.error ?? e?.message ?? 'AI request failed. Please try again.';
+      setAiError(msg);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function handleRunAnalysis() {
+    if (!rec) return;
+    setParseError('');
+    try {
+      const r = runAnalysis(rawData, rec);
+      setResult(r);
+      setStep('results');
+    } catch (e: any) {
+      setParseError(e.message ?? 'Could not parse your data. Please check the format.');
+    }
+  }
+
+  function handleReset() {
+    setStep('describe'); setQuestion(''); setRec(null);
+    setRawData(''); setResult(null); setParseError(''); setAiError('');
+    chartInst.current?.destroy(); chartInst.current = null;
+  }
+
+  // ── Step 1: Describe ──────────────────────────────────────────────────────
+  if (step === 'describe') return (
+    <div className="space-y-6">
+      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6">
+        <div className="flex items-center gap-2 mb-3 text-indigo-700 font-semibold text-sm">
+          <Sparkles size={16} /> Step 1 of 3 — Describe your study
+        </div>
+        <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+          Tell the AI what your study is about in plain English. No need to mention test names — just describe
+          what you measured, who your participants are, and what you want to find out.
+        </p>
+        <textarea
+          value={question}
+          onChange={e => { setQuestion(e.target.value); setAiError(''); }}
+          placeholder="e.g. I gave 30 patients Ashwagandha tablets for 8 weeks and measured their stress score before and after using the PSS questionnaire. I want to know if the treatment significantly reduced stress."
+          className="w-full border border-gray-200 rounded-xl p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 min-h-[120px]"
+        />
+        {aiError && (
+          <div className="mt-3 flex items-start gap-2 text-red-600 text-sm bg-red-50 rounded-lg p-3">
+            <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+            <span>{aiError}</span>
+          </div>
+        )}
+        <button
+          onClick={handleAskAI}
+          disabled={aiLoading}
+          className="mt-4 w-full flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-indigo-700 transition-colors disabled:opacity-60"
+        >
+          {aiLoading ? <><Loader2 size={16} className="animate-spin" /> Thinking…</> : <><Sparkles size={16} /> Ask AI →</>}
+        </button>
+      </div>
+
+      {/* Example prompts */}
+      <div>
+        <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Example questions you can ask:</p>
+        <div className="space-y-2">
+          {[
+            'I compared blood pressure in 25 patients before and after 12 weeks of Siddha herbal treatment.',
+            'I want to see if there is a relationship between BMI and fasting blood glucose in my patients.',
+            'I have 3 groups: Ayurveda treatment, conventional medicine, and control. I measured pain scores after 4 weeks.',
+            'I want to test if my 10-item wellness questionnaire is reliable (internally consistent).',
+          ].map(q => (
+            <button
+              key={q}
+              onClick={() => setQuestion(q)}
+              className="w-full text-left text-sm text-gray-600 bg-gray-50 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-200 rounded-lg px-4 py-2.5 transition-colors"
+            >
+              "{q}"
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Step 2: Enter Data ────────────────────────────────────────────────────
+  if (step === 'data' && rec) return (
+    <div className="space-y-5">
+      {/* Back */}
+      <button onClick={() => setStep('describe')} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-indigo-600 transition-colors">
+        <ArrowLeft size={14} /> Back to study description
+      </button>
+
+      {/* Recommendation card */}
+      <div className="bg-white border border-indigo-200 rounded-2xl p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="bg-indigo-100 text-indigo-700 rounded-xl p-2 flex-shrink-0"><BarChart2 size={20} /></div>
+          <div>
+            <div className="text-xs font-semibold text-indigo-500 uppercase tracking-wider mb-1">Recommended Test</div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{rec.testName}</h3>
+            <p className="text-sm text-gray-600 leading-relaxed">{rec.rationale}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Unsupported tests */}
+      {rec.dataInput.type === 'unsupported' ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-semibold text-amber-800 mb-2">This test requires SPSS</h4>
+              <p className="text-sm text-amber-700 leading-relaxed">{rec.dataInput.instructions}</p>
+              <button
+                onClick={() => { handleReset(); }}
+                className="mt-4 text-sm text-amber-700 underline hover:text-amber-900"
+              >
+                Try a different study description
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Sample size guidance */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-amber-50 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-amber-700">{rec.dataInput.sampleSizeMin}</div>
+              <div className="text-xs text-amber-600 mt-1">Minimum participants</div>
+            </div>
+            <div className="bg-green-50 rounded-xl p-4 text-center">
+              <div className="text-2xl font-bold text-green-700">{rec.dataInput.sampleSizeRecommended}</div>
+              <div className="text-xs text-green-600 mt-1">Recommended participants</div>
+            </div>
+          </div>
+
+          {/* Instructions */}
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+            <div className="flex items-center gap-2 text-blue-700 font-semibold text-sm mb-2">
+              <Info size={14} /> How to enter your data
+            </div>
+            <p className="text-sm text-blue-800 leading-relaxed whitespace-pre-line">{rec.dataInput.instructions}</p>
+          </div>
+
+          {/* Data input */}
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+              <FileText size={14} /> Step 2 of 3 — Paste your data
+            </div>
+            <textarea
+              value={rawData}
+              onChange={e => { setRawData(e.target.value); setParseError(''); }}
+              className="w-full font-mono text-xs border border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-indigo-400 min-h-[160px] resize-y"
+              placeholder="Paste or type your data here…"
+            />
+            {parseError && (
+              <div className="mt-2 flex items-start gap-2 text-red-600 text-sm bg-red-50 rounded-lg p-3">
+                <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                <span>{parseError}</span>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={handleRunAnalysis}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white rounded-xl py-3 font-semibold text-sm hover:bg-emerald-700 transition-colors"
+          >
+            <BarChart2 size={16} /> Run Analysis →
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  // ── Step 3: Results ───────────────────────────────────────────────────────
+  if (step === 'results' && result) return (
+    <div className="space-y-6">
+      {/* Verdict banner */}
+      <div className={`rounded-2xl p-5 flex items-start gap-4 ${result.sig ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+        {result.sig
+          ? <CheckCircle size={28} className="text-green-500 flex-shrink-0 mt-0.5" />
+          : <AlertCircle size={28} className="text-gray-400 flex-shrink-0 mt-0.5" />}
+        <div>
+          <div className="font-bold text-gray-900 text-base mb-1">{result.testName} — {result.sig ? 'Statistically Significant' : 'Not Significant'}</div>
+          <p className="text-sm text-gray-600 leading-relaxed">{result.interpretation}</p>
+        </div>
+      </div>
+
+      {/* Stats table */}
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          Results
+        </div>
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-gray-100">
+            <tr className="hover:bg-gray-50">
+              <td className="px-5 py-3 text-gray-500 font-medium w-1/2">{result.statLabel}</td>
+              <td className="px-5 py-3 font-mono font-semibold text-gray-900">{isNaN(result.statValue) ? '—' : result.statValue}</td>
+            </tr>
+            {result.df && <tr className="hover:bg-gray-50"><td className="px-5 py-3 text-gray-500 font-medium">df</td><td className="px-5 py-3 font-mono text-gray-900">{result.df}</td></tr>}
+            {!isNaN(result.pValue) && (
+              <tr className="hover:bg-gray-50">
+                <td className="px-5 py-3 text-gray-500 font-medium">p-value</td>
+                <td className="px-5 py-3 font-mono font-semibold">
+                  <span className={result.pValue < 0.05 ? 'text-green-700' : 'text-gray-700'}>
+                    {result.pValue < 0.001 ? '< .001' : result.pValue.toFixed(3)}
+                    {result.pValue < 0.05 ? ' ✓ sig.' : ' n.s.'}
+                  </span>
+                </td>
+              </tr>
+            )}
+            {result.effectLabel && (
+              <tr className="hover:bg-gray-50">
+                <td className="px-5 py-3 text-gray-500 font-medium">Effect size</td>
+                <td className="px-5 py-3 font-mono text-gray-900">{result.effectLabel}</td>
+              </tr>
+            )}
+            {result.extraRows.map(([label, val]) => (
+              <tr key={label} className="hover:bg-gray-50">
+                <td className="px-5 py-3 text-gray-500">{label}</td>
+                <td className="px-5 py-3 font-mono text-gray-700 text-xs">{val}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Paper sentence */}
+      <div className="bg-violet-50 border border-violet-200 rounded-2xl p-5">
+        <div className="flex items-center gap-2 text-violet-700 font-semibold text-sm mb-2">
+          <Lightbulb size={14} /> Ready-to-use sentence for your paper
+        </div>
+        <p className="text-sm text-gray-800 leading-relaxed font-medium">{result.paperSentence}</p>
+        <button
+          onClick={() => navigator.clipboard?.writeText(result.paperSentence)}
+          className="mt-3 text-xs text-violet-600 hover:text-violet-800 underline"
+        >
+          Copy to clipboard
+        </button>
+      </div>
+
+      {/* Chart */}
+      {(result.chartType === 'bar' || result.chartType === 'scatter') && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Chart</div>
+          <canvas ref={chartRef} />
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => { setStep('data'); setResult(null); chartInst.current?.destroy(); chartInst.current = null; }}
+          className="flex-1 flex items-center justify-center gap-2 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <RefreshCw size={14} /> Edit data & re-run
+        </button>
+        <button
+          onClick={handleReset}
+          className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-colors"
+        >
+          <Sparkles size={14} /> New analysis
+        </button>
+      </div>
+    </div>
+  );
+
+  return null;
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 const tabs: { id: Tab; label: string; icon: typeof FlaskConical; desc: string }[] = [
-  { id: 'finder',    label: 'Find My Test',       icon: FlaskConical,   desc: 'Answer 3–4 simple questions about your study → get the exact test you need' },
-  { id: 'library',   label: 'Learn All Tests',     icon: BookOpen,       desc: 'Browse every statistical test with plain-English explanations and visual examples' },
-  { id: 'interpret', label: 'What Does This Mean?',icon: MessageSquare,  desc: 'Copy a number from your SPSS output → get a sentence ready to paste into your paper' },
-  { id: 'checklist', label: 'My Research Progress',icon: CheckSquare,    desc: 'Tick off tasks as you go — from study design all the way to journal submission' },
+  { id: 'finder',    label: 'Find My Test',        icon: FlaskConical,  desc: 'Answer 3–4 simple questions about your study → get the exact test you need' },
+  { id: 'library',   label: 'Learn All Tests',      icon: BookOpen,      desc: 'Browse every statistical test with plain-English explanations and visual examples' },
+  { id: 'interpret', label: 'What Does This Mean?', icon: MessageSquare, desc: 'Copy a number from your SPSS output → get a sentence ready to paste into your paper' },
+  { id: 'checklist', label: 'My Research Progress', icon: CheckSquare,   desc: 'Tick off tasks as you go — from study design all the way to journal submission' },
+  { id: 'analysis',  label: 'Analysis Lab',         icon: BarChart2,     desc: 'Describe your study → AI picks the right test → paste your data → get instant results & charts' },
 ];
 
 export default function ResearchStudioPage() {
@@ -1301,6 +2089,7 @@ export default function ResearchStudioPage() {
         {activeTab === 'library'   && <TestLibrary />}
         {activeTab === 'interpret' && <InterpretHelper />}
         {activeTab === 'checklist' && <ResearchChecklist />}
+        {activeTab === 'analysis'  && <AnalysisLab />}
       </div>
     </div>
   );

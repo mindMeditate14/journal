@@ -23,6 +23,7 @@ import ingestRoutes from './routes/ingest.js';
 import adminRoutes from './routes/admin.js';
 import practiceDataRoutes from './routes/practiceData.js';
 import configRoutes from './routes/config.js';
+import researchAIRoutes from './routes/researchAI.js';
 
 // ── Scholar-friendly paper page & sitemap ───────────────────────────────────
 // Lazy-import Paper model to avoid circular deps at module load time
@@ -104,6 +105,7 @@ app.use('/api/ingest', ingestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/practice-data', practiceDataRoutes);
+app.use('/api/research-ai', researchAIRoutes);
 
 // ── SPA fallback for bare /papers path (nginx location /papers/ redirects /papers → /papers/) ──
 app.get(['/papers', '/papers/'], (req, res) => {
