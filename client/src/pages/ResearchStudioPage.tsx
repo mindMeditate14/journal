@@ -1785,6 +1785,10 @@ function AnalysisLab() {
   const [question, setQuestion] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [selectedFields, setSelectedFields] = useState<string[]>([]);
+  const [customFields, setCustomFields] = useState<string[]>([]);
+  const [customInput, setCustomInput] = useState('');
+  const [showFields, setShowFields] = useState(false);
   const [rec, setRec] = useState<Recommendation | null>(null);
   const [rawData, setRawData] = useState('');
   const [parseError, setParseError] = useState('');
@@ -1848,7 +1852,10 @@ function AnalysisLab() {
     }
     setAiLoading(true); setAiError('');
     try {
-      const res = await apiClient.post('/research-ai/recommend', { question: question.trim() });
+      const allFields = [...selectedFields, ...customFields];
+      let enrichedQ = question.trim();
+      if (allFields.length > 0) enrichedQ += `\n\nData fields I have available: ${allFields.join(', ')}`;
+      const res = await apiClient.post('/research-ai/recommend', { question: enrichedQ });
       const data = (res as any).data ?? res;
       setRec(data);
       setRawData(data.dataInput?.example ?? '');
@@ -1876,6 +1883,7 @@ function AnalysisLab() {
   function handleReset() {
     setStep('describe'); setQuestion(''); setRec(null);
     setRawData(''); setResult(null); setParseError(''); setAiError('');
+    setSelectedFields([]); setCustomFields([]); setCustomInput(''); setShowFields(false);
     chartInst.current?.destroy(); chartInst.current = null;
   }
 
@@ -1896,6 +1904,77 @@ function AnalysisLab() {
           placeholder="e.g. I gave 30 patients Ashwagandha tablets for 8 weeks and measured their stress score before and after using the PSS questionnaire. I want to know if the treatment significantly reduced stress."
           className="w-full border border-gray-200 rounded-xl p-4 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 min-h-[120px]"
         />
+
+        {/* Field selector */}
+        <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowFields(f => !f)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              {showFields ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              What data fields do you have?
+              <span className="text-gray-400 font-normal text-xs">optional — helps AI give better advice</span>
+            </span>
+            {(selectedFields.length + customFields.length) > 0 && (
+              <span className="bg-indigo-600 text-white text-xs rounded-full px-2 py-0.5">
+                {selectedFields.length + customFields.length} selected
+              </span>
+            )}
+          </button>
+          {showFields && (
+            <div className="border-t border-gray-100 p-4 space-y-4 bg-gray-50">
+              {FIELD_CATEGORIES.map(cat => (
+                <div key={cat.label}>
+                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{cat.label}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cat.fields.map(f => {
+                      const sel = selectedFields.includes(f);
+                      return (
+                        <button key={f} type="button"
+                          onClick={() => setSelectedFields(prev => sel ? prev.filter(x => x !== f) : [...prev, f])}
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                            sel ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-400 hover:text-indigo-600'
+                          }`}
+                        >{f}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {customFields.length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Your Custom Fields</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {customFields.map(f => (
+                      <span key={f} className="text-xs px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 border border-violet-200 flex items-center gap-1">
+                        {f}
+                        <button type="button" onClick={() => setCustomFields(prev => prev.filter(x => x !== f))} className="hover:text-red-500 ml-0.5 font-bold">×</button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  value={customInput}
+                  onChange={e => setCustomInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && customInput.trim()) { setCustomFields(prev => [...prev, customInput.trim()]); setCustomInput(''); } }}
+                  placeholder="Add custom field (e.g. Nadi Pariksha Score)…"
+                  className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                />
+                <button type="button"
+                  onClick={() => { if (customInput.trim()) { setCustomFields(prev => [...prev, customInput.trim()]); setCustomInput(''); } }}
+                  className="flex items-center gap-1 text-xs px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200 hover:bg-indigo-100 transition-colors"
+                >
+                  <Plus size={12} /> Add
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {aiError && (
           <div className="mt-3 flex items-start gap-2 text-red-600 text-sm bg-red-50 rounded-lg p-3">
             <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
@@ -1991,6 +2070,24 @@ function AnalysisLab() {
               <Info size={14} /> How to enter your data
             </div>
             <p className="text-sm text-blue-800 leading-relaxed whitespace-pre-line">{rec.dataInput.instructions}</p>
+          </div>
+
+          {/* Download Excel template */}
+          <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+            <div>
+              <div className="text-sm font-semibold text-emerald-800 mb-0.5">Download Excel Template</div>
+              <div className="text-xs text-emerald-600">Fill in your data, then copy-paste it into the box below.</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const csv = generateCsvTemplate(rec, [...selectedFields, ...customFields]);
+                downloadCsv(csv, `analysis-template-${rec.test}.csv`);
+              }}
+              className="flex items-center gap-2 text-sm font-semibold text-emerald-700 bg-white border border-emerald-300 rounded-lg px-4 py-2 hover:bg-emerald-50 transition-colors whitespace-nowrap flex-shrink-0 ml-4"
+            >
+              <Download size={14} /> Download .csv
+            </button>
           </div>
 
           {/* Data input */}
