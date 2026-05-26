@@ -3,7 +3,7 @@ import {
   FlaskConical, BookOpen, MessageSquare, CheckSquare,
   ChevronRight, ChevronDown, ChevronUp, Search,
   AlertCircle, CheckCircle, Info, Lightbulb, ArrowLeft, Sparkles,
-  BarChart2, Loader2, RefreshCw, FileText, Download, Plus
+  BarChart2, Loader2, RefreshCw, FileText, Download, Plus, Upload
 } from 'lucide-react';
 import {
   Chart, BarController, BarElement, CategoryScale, LinearScale,
@@ -1615,39 +1615,54 @@ function skipHeader(lines: string[]): string[] {
 function generateCsvTemplate(rec: Recommendation, fields: string[]): string {
   const type = rec.dataInput.type;
   const labels = rec.dataInput.labels ?? [];
-  const primary = fields[0] ?? labels[0] ?? 'Value';
-  const secondary = fields[1] ?? labels[1] ?? fields[0] ?? 'Value 2';
   const rows: string[] = [];
+  // 10 rows of deterministic sample values (columns = different field types)
+  const S = [
+    [72,130,25,7,28,6,95,110,45,62], [68,118,24,7,25,6,92,105,42,58],
+    [75,125,26,8,31,6,98,115,48,65], [80,135,28,8,35,6,101,120,52,70],
+    [66,115,23,7,24,5,91,102,40,55], [73,122,25,7,29,6,96,112,44,61],
+    [77,128,27,8,33,6,99,118,50,68], [70,119,24,7,27,6,94,108,43,60],
+    [74,123,26,7,30,6,97,114,46,63], [69,117,23,7,26,6,93,107,41,57],
+  ];
 
   if (type === 'paired') {
-    const l1 = labels[0] ?? `${primary} (Before)`;
-    const l2 = labels[1] ?? `${primary} (After)`;
-    rows.push(`${l1},${l2}`);
-    [[28,22],[31,25],[26,19],[33,28],[29,23],[35,27],[24,18],[30,24],[27,21],[32,26]].forEach(r => rows.push(r.join(',')));
+    const colFields = fields.length > 0 ? fields : [labels[0] ?? 'Value'];
+    rows.push(['Participant', ...colFields.flatMap(f => [`${f} (Before)`, `${f} (After)`])].join(','));
+    S.forEach((vals, i) => {
+      const row: (string | number)[] = [`P${String(i+1).padStart(3,'0')}`];
+      colFields.forEach((_, fi) => { const b = vals[fi % vals.length]; row.push(b, Math.round(b * 0.85)); });
+      rows.push(row.join(','));
+    });
   } else if (type === 'two-groups' || type === 'multi-groups') {
     const groupNames = labels.length >= 2 ? labels : type === 'multi-groups' ? ['Treatment A','Treatment B','Control'] : ['Treatment','Control'];
-    rows.push(`Group,${primary}`);
-    const sampleVals = [[78,82,75,90,68,85,79,88,72,83],[45,52,49,61,43,58,47,55,51,48],[62,67,71,58,65,70,64,69,66,72]];
-    groupNames.forEach((g, gi) => sampleVals[gi % sampleVals.length].forEach(v => rows.push(`${g},${v}`)));
+    const colFields = fields.length > 0 ? fields : [labels[0] ?? 'Value'];
+    rows.push(['Participant','Group',...colFields].join(','));
+    const gVals = [[78,82,75,90,68,85,79,88,72,83],[45,52,49,61,43,58,47,55,51,48],[62,67,71,58,65,70,64,69,66,72]];
+    let p = 1;
+    groupNames.forEach((g, gi) => gVals[gi % gVals.length].forEach((v, si) => {
+      const extra = colFields.slice(1).map((_, fi) => S[si % S.length][(fi+1) % S[0].length]);
+      rows.push([`P${String(p++).padStart(3,'0')}`, g, v, ...extra].join(','));
+    }));
   } else if (type === 'correlation') {
-    rows.push(`${primary},${secondary}`);
-    [[22,110],[25,125],[28,135],[31,140],[24,115],[27,130],[30,138],[23,112],[26,128],[29,132],[32,145],[21,108]].forEach(r => rows.push(r.join(',')));
+    const cf = fields.length >= 2 ? fields.slice(0,2) : fields.length === 1 ? [fields[0], labels[1] ?? 'Variable 2'] : [labels[0] ?? 'Variable X', labels[1] ?? 'Variable Y'];
+    rows.push(['Participant',...cf].join(','));
+    [[22,110],[25,125],[28,135],[31,140],[24,115],[27,130],[30,138],[23,112],[26,128],[29,132],[32,145],[21,108]]
+      .forEach((r,i) => rows.push([`P${String(i+1).padStart(3,'0')}`,...r].join(',')));
   } else if (type === 'categories') {
     const cols = labels.length >= 2 ? labels.slice(0,3) : ['Category A','Category B','Category C'];
-    const rLabels = ['Group 1','Group 2'];
-    rows.push(`,${cols.join(',')}`);
-    rLabels.forEach((r, ri) => rows.push(`${r},${cols.map((_,ci) => (ri===0?[28,14,8]:[12,18,20])[ci]).join(',')}` ));
+    rows.push(['', ...cols].join(','));
+    rows.push(['Group 1',28,14,8].join(','));
+    rows.push(['Group 2',12,18,20].join(','));
   } else if (type === 'items') {
-    const k = Math.min(Math.max(labels.length, 5), 10);
+    const k = Math.max(Math.min(labels.length, 10), 5);
     const itemLabels = Array.from({length: k}, (_, i) => labels[i] ?? `Item ${i+1}`);
-    rows.push(`Participant,${itemLabels.join(',')}`);
+    rows.push(['Participant',...itemLabels].join(','));
     [[4,3,5,4,3],[5,4,5,5,4],[3,3,4,3,2],[4,4,4,5,4],[5,5,4,4,5],[2,3,3,2,3],[4,3,4,4,3],[5,4,5,4,4],[3,4,3,3,4],[4,5,4,5,4]]
-      .forEach((row, i) => rows.push(`P${String(i+1).padStart(3,'0')},${Array.from({length:k},(_,j)=>row[j%5]).join(',')}`));
+      .forEach((row,i) => rows.push([`P${String(i+1).padStart(3,'0')}`,...Array.from({length:k},(_,j)=>row[j%5])].join(',')));
   } else {
-    const varLabels = fields.length > 0 ? fields.slice(0,4) : labels.slice(0,4).length > 0 ? labels.slice(0,4) : ['Variable 1','Variable 2'];
-    rows.push(`Participant,${varLabels.join(',')}`);
-    [[72,120,28,85],[68,118,25,82],[75,125,31,88],[80,130,35,90],[66,115,24,78],[73,122,29,84],[77,128,33,87],[70,119,27,81],[74,123,30,86],[69,117,26,80]]
-      .forEach((row, i) => rows.push(`P${String(i+1).padStart(3,'0')},${varLabels.map((_,vi)=>row[vi%row.length]).join(',')}`));
+    const colFields = fields.length > 0 ? fields : labels.length > 0 ? labels : ['Variable 1','Variable 2'];
+    rows.push(['Participant',...colFields].join(','));
+    S.forEach((vals,i) => rows.push([`P${String(i+1).padStart(3,'0')}`,...colFields.map((_,fi)=>vals[fi%vals.length])].join(',')));
   }
   return rows.join('\n');
 }
@@ -1660,22 +1675,25 @@ function downloadCsv(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function runAnalysis(raw: string, rec: Recommendation): StatResult {
+function runAnalysis(raw: string, rec: Recommendation): StatResult[] {
   const lines = raw.trim().split('\n').map(l => l.trim()).filter(Boolean);
   const type = rec.dataInput.type;
   const labels = rec.dataInput.labels ?? [];
+  const out: StatResult[] = [];
 
   if (type === 'paired') {
     const dataLines = skipHeader(lines);
     const pairs = dataLines.map(l => l.split(/[,\t]+/).map(s => Number(s.trim())));
     const valid = pairs.filter(p => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
     if (valid.length < 3) throw new Error('Need at least 3 valid rows (before, after).');
-    return runPairedTTest(valid.map(p => p[0]), valid.map(p => p[1]), labels[0] ?? 'Before', labels[1] ?? 'After');
+    const col1 = valid.map(p => p[0]), col2 = valid.map(p => p[1]);
+    out.push(runPairedTTest(col1, col2, labels[0] ?? 'Before', labels[1] ?? 'After'));
+    out.push({ ...runDescriptive([{ name: labels[0] ?? 'Before', values: col1 }, { name: labels[1] ?? 'After', values: col2 }]), chartType: 'none' });
+    return out;
   }
 
   if (type === 'two-groups' || type === 'multi-groups') {
     const groups: { name: string; values: number[] }[] = [];
-    // Try colon format first: "GroupName: v1, v2, v3"
     for (const line of lines) {
       const colonIdx = line.indexOf(':');
       if (colonIdx === -1) continue;
@@ -1683,7 +1701,6 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
       const values = parseNumbers(line.slice(colonIdx + 1));
       if (values.length > 0) groups.push({ name, values });
     }
-    // Fall back to tabular format: Group,Value (one row per observation)
     if (groups.length < 2) {
       const dataLines = skipHeader(lines);
       const groupMap: Record<string, number[]> = {};
@@ -1691,17 +1708,23 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
         const cells = line.split(/[,\t]+/);
         if (cells.length < 2) continue;
         const gName = cells[0].trim();
-        const val = Number(cells[1].trim());
-        if (gName && !isNaN(val)) { if (!groupMap[gName]) groupMap[gName] = []; groupMap[gName].push(val); }
+        if (!gName || !isNaN(Number(gName))) continue;
+        // First numeric cell after group name
+        for (let ci = 1; ci < cells.length; ci++) {
+          const n = Number(cells[ci].trim());
+          if (!isNaN(n)) { if (!groupMap[gName]) groupMap[gName] = []; groupMap[gName].push(n); break; }
+        }
       }
       groups.length = 0;
       for (const [name, values] of Object.entries(groupMap)) if (values.length > 0) groups.push({ name, values });
     }
-    if (groups.length < 2) throw new Error('Each group should be on its own line: GroupName: v1, v2, v3  — or use the downloaded template format.');
+    if (groups.length < 2) throw new Error('Each group should be on its own line: GroupName: v1, v2, v3 — or use the downloaded template format.');
     if (groups.some(g => g.values.length < 3)) throw new Error('Each group needs at least 3 values.');
-    return groups.length === 2
+    out.push(groups.length === 2
       ? runIndependentTTest(groups[0].values, groups[1].values, groups[0].name, groups[1].name)
-      : runANOVA(groups);
+      : runANOVA(groups));
+    out.push({ ...runDescriptive(groups), chartType: 'none' });
+    return out;
   }
 
   if (type === 'correlation') {
@@ -1709,7 +1732,10 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
     const pairs = dataLines.map(l => l.split(/[,\t]+/).map(s => Number(s.trim())));
     const valid = pairs.filter(p => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
     if (valid.length < 5) throw new Error('Need at least 5 valid x, y pairs.');
-    return runPearson(valid.map(p => p[0]), valid.map(p => p[1]), labels[0] ?? 'X', labels[1] ?? 'Y');
+    const x = valid.map(p => p[0]), y = valid.map(p => p[1]);
+    out.push(runPearson(x, y, labels[0] ?? 'X', labels[1] ?? 'Y'));
+    out.push({ ...runDescriptive([{ name: labels[0] ?? 'X', values: x }, { name: labels[1] ?? 'Y', values: y }]), chartType: 'none' });
+    return out;
   }
 
   if (type === 'categories') {
@@ -1722,20 +1748,24 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
       if (!values.some(isNaN) && values.length > 0) rows.push({ label, values });
     }
     if (rows.length < 2 || header.length < 2) throw new Error('Need at least a 2×2 table. First row = column headers, first column = row labels.');
-    return runChiSquare(rows.map(r => r.values), rows.map(r => r.label), header);
+    out.push(runChiSquare(rows.map(r => r.values), rows.map(r => r.label), header));
+    return out;
   }
 
   if (type === 'items') {
     const dataLines = skipHeader(lines);
     const matrix = dataLines.map(l => {
       const cells = l.split(/[,\t]+/).map(s => s.trim());
-      const startIdx = isNaN(Number(cells[0])) ? 1 : 0; // skip participant ID column
+      const startIdx = isNaN(Number(cells[0])) ? 1 : 0;
       return cells.slice(startIdx).map(Number);
     });
     const k = matrix[0]?.length ?? 0;
     const valid = matrix.filter(row => row.length === k && !row.some(isNaN));
     if (valid.length < 5 || k < 2) throw new Error('Need at least 5 participants and 2 items. Each row = one participant, columns = item scores.');
-    return runCronbach(valid);
+    out.push(runCronbach(valid));
+    const itemVars = Array.from({ length: k }, (_, j) => ({ name: `Item ${j+1}`, values: valid.map(row => row[j]) }));
+    out.push({ ...runDescriptive(itemVars), chartType: 'bar' });
+    return out;
   }
 
   if (type === 'descriptive') {
@@ -1751,7 +1781,6 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
         if (values.length > 0) vars.push({ name: 'Variable', values });
       }
     }
-    // Try tabular format: Participant,Var1,Var2,... (columns = variables)
     if (vars.length === 0 || (vars.length === 1 && vars[0].name === 'Variable')) {
       const firstCells = lines[0]?.split(/[,\t]+/).map(s => s.trim()) ?? [];
       if (firstCells.some(c => c !== '' && isNaN(Number(c)))) {
@@ -1761,20 +1790,97 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult {
         for (const line of dataLines) {
           const cells = line.split(/[,\t]+/).map(s => s.trim());
           const startIdx = isNaN(Number(cells[0])) ? 1 : 0;
-          headers.forEach((_, i) => {
-            const val = Number(cells[startIdx + i]);
-            if (!isNaN(val)) columns[i].push(val);
-          });
+          headers.forEach((_, i) => { const val = Number(cells[startIdx + i]); if (!isNaN(val)) columns[i].push(val); });
         }
         vars.length = 0;
         headers.forEach((h, i) => { if (columns[i].length > 0) vars.push({ name: h, values: columns[i] }); });
       }
     }
     if (vars.length === 0) throw new Error('No valid data found. Format: VariableName: v1, v2, v3 — or use the downloaded template.');
-    return runDescriptive(vars);
+    out.push(runDescriptive(vars));
+    return out;
   }
 
   throw new Error('Unsupported test type — please use SPSS for this analysis.');
+}
+
+// ── ResultCard component (manages its own Chart instance) ───────────────────
+
+function ResultCard({ result, isPrimary }: { result: StatResult; isPrimary: boolean }) {
+  const chartRef = useRef<HTMLCanvasElement>(null);
+  const chartInst = useRef<InstanceType<typeof Chart> | null>(null);
+  useEffect(() => () => { chartInst.current?.destroy(); }, []);
+  useEffect(() => {
+    if (!chartRef.current || result.chartType === 'none') return;
+    chartInst.current?.destroy(); chartInst.current = null;
+    const ctx = chartRef.current.getContext('2d');
+    if (!ctx) return;
+    if (result.chartType === 'bar') {
+      chartInst.current = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: result.chartLabels, datasets: result.chartDatasets.map(d => ({ label: d.label, data: d.data, backgroundColor: d.color, borderRadius: 6 })) },
+        options: { responsive: true, plugins: { legend: { display: result.chartDatasets.length > 1 } }, scales: { y: { beginAtZero: false } } },
+      });
+    } else if (result.chartType === 'scatter' && result.scatterPoints) {
+      chartInst.current = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets: [{ label: `${result.chartLabels[0]} vs ${result.chartLabels[1]}`, data: result.scatterPoints, backgroundColor: 'rgba(99,102,241,0.6)', pointRadius: 5 }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { title: { display: true, text: result.chartLabels[0] } }, y: { title: { display: true, text: result.chartLabels[1] } } } },
+      });
+    }
+  }, [result]);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      {/* Header */}
+      <div className={`px-5 py-3 flex items-center gap-3 ${isPrimary ? 'bg-indigo-600' : 'bg-gray-100'}`}>
+        <span className={`text-sm font-bold ${isPrimary ? 'text-white' : 'text-gray-700'}`}>{result.testName}</span>
+        {!isNaN(result.pValue) && (
+          <span className={`text-xs px-2 py-0.5 rounded-full ml-auto ${
+            result.sig ? 'bg-green-100 text-green-700' : 'bg-white/20 text-white'
+          } ${isPrimary && !result.sig ? 'bg-white/20 text-white' : ''}`}>
+            {result.sig ? '✓ Significant' : 'Not Significant'} (p={result.pValue < 0.001 ? '<.001' : result.pValue.toFixed(3)})
+          </span>
+        )}
+      </div>
+      {/* Stats table */}
+      <table className="w-full text-sm">
+        <tbody className="divide-y divide-gray-100">
+          {!isNaN(result.statValue) && <tr className="hover:bg-gray-50"><td className="px-5 py-2.5 text-gray-500 font-medium w-1/2">{result.statLabel}</td><td className="px-5 py-2.5 font-mono font-semibold text-gray-900">{result.statValue}</td></tr>}
+          {result.df && <tr className="hover:bg-gray-50"><td className="px-5 py-2.5 text-gray-500 font-medium">df</td><td className="px-5 py-2.5 font-mono text-gray-900">{result.df}</td></tr>}
+          {!isNaN(result.pValue) && (
+            <tr className="hover:bg-gray-50">
+              <td className="px-5 py-2.5 text-gray-500 font-medium">p-value</td>
+              <td className="px-5 py-2.5 font-mono font-semibold">
+                <span className={result.pValue < 0.05 ? 'text-green-700' : 'text-gray-700'}>
+                  {result.pValue < 0.001 ? '< .001' : result.pValue.toFixed(3)}{result.pValue < 0.05 ? ' ✓ sig.' : ' n.s.'}
+                </span>
+              </td>
+            </tr>
+          )}
+          {result.effectLabel && <tr className="hover:bg-gray-50"><td className="px-5 py-2.5 text-gray-500 font-medium">Effect size</td><td className="px-5 py-2.5 font-mono text-gray-900">{result.effectLabel}</td></tr>}
+          {result.extraRows.map(([label, val]) => (
+            <tr key={label} className="hover:bg-gray-50">
+              <td className="px-5 py-2.5 text-gray-500">{label}</td>
+              <td className="px-5 py-2.5 font-mono text-gray-700 text-xs">{val}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* Paper sentence (primary only) */}
+      {isPrimary && result.paperSentence && (
+        <div className="bg-violet-50 border-t border-violet-200 px-5 py-4">
+          <div className="flex items-center gap-2 text-violet-700 font-semibold text-xs mb-1.5"><Lightbulb size={12} /> Ready-to-use sentence for your paper</div>
+          <p className="text-sm text-gray-800 leading-relaxed">{result.paperSentence}</p>
+          <button onClick={() => navigator.clipboard?.writeText(result.paperSentence)} className="mt-2 text-xs text-violet-600 hover:text-violet-800 underline">Copy to clipboard</button>
+        </div>
+      )}
+      {/* Chart */}
+      {(result.chartType === 'bar' || result.chartType === 'scatter') && (
+        <div className="border-t border-gray-100 px-5 pb-5 pt-4"><canvas ref={chartRef} /></div>
+      )}
+    </div>
+  );
 }
 
 // ── AnalysisLab Component ─────────────────────────────────────────────────────
@@ -1789,61 +1895,10 @@ function AnalysisLab() {
   const [customFields, setCustomFields] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState('');
   const [showFields, setShowFields] = useState(false);
-  const [rec, setRec] = useState<Recommendation | null>(null);
+  const [results, setResults] = useState<StatResult[]>([]);
   const [rawData, setRawData] = useState('');
   const [parseError, setParseError] = useState('');
-  const [result, setResult] = useState<StatResult | null>(null);
-  const chartRef = useRef<HTMLCanvasElement>(null);
-  const chartInst = useRef<InstanceType<typeof Chart> | null>(null);
-
-  // Destroy chart on unmount
-  useEffect(() => () => { chartInst.current?.destroy(); }, []);
-
-  // Render chart whenever result changes
-  useEffect(() => {
-    if (!result || !chartRef.current) return;
-    chartInst.current?.destroy();
-    chartInst.current = null;
-    const ctx = chartRef.current.getContext('2d');
-    if (!ctx) return;
-
-    if (result.chartType === 'bar') {
-      chartInst.current = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: result.chartLabels,
-          datasets: result.chartDatasets.map(d => ({
-            label: d.label, data: d.data, backgroundColor: d.color, borderRadius: 6,
-          })),
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: result.chartDatasets.length > 1 } },
-          scales: { y: { beginAtZero: false } },
-        },
-      });
-    } else if (result.chartType === 'scatter' && result.scatterPoints) {
-      chartInst.current = new Chart(ctx, {
-        type: 'scatter',
-        data: {
-          datasets: [{
-            label: `${result.chartLabels[0]} vs ${result.chartLabels[1]}`,
-            data: result.scatterPoints,
-            backgroundColor: 'rgba(99,102,241,0.6)',
-            pointRadius: 5,
-          }],
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { title: { display: true, text: result.chartLabels[0] ?? 'X' } },
-            y: { title: { display: true, text: result.chartLabels[1] ?? 'Y' } },
-          },
-        },
-      });
-    }
-  }, [result]);
+  const [rec, setRec] = useState<Recommendation | null>(null);
 
   async function handleAskAI() {
     if (question.trim().length < 10) {
@@ -1873,7 +1928,7 @@ function AnalysisLab() {
     setParseError('');
     try {
       const r = runAnalysis(rawData, rec);
-      setResult(r);
+      setResults(r);
       setStep('results');
     } catch (e: any) {
       setParseError(e.message ?? 'Could not parse your data. Please check the format.');
@@ -1882,9 +1937,8 @@ function AnalysisLab() {
 
   function handleReset() {
     setStep('describe'); setQuestion(''); setRec(null);
-    setRawData(''); setResult(null); setParseError(''); setAiError('');
+    setRawData(''); setResults([]); setParseError(''); setAiError('');
     setSelectedFields([]); setCustomFields([]); setCustomInput(''); setShowFields(false);
-    chartInst.current?.destroy(); chartInst.current = null;
   }
 
   // ── Step 1: Describe ──────────────────────────────────────────────────────
@@ -2101,6 +2155,21 @@ function AnalysisLab() {
               className="w-full font-mono text-xs border border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-indigo-400 min-h-[160px] resize-y"
               placeholder="Paste or type your data here…"
             />
+            {/* File upload shortcut */}
+            <label className="mt-2 inline-flex items-center gap-1.5 cursor-pointer text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg px-3 py-1.5 hover:bg-indigo-100 transition-colors">
+              <Upload size={12} /> Upload filled template (.csv)
+              <input type="file" accept=".csv,.txt" className="hidden" onChange={e => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                  const text = ev.target?.result as string;
+                  if (text) { setRawData(text.trim()); setParseError(''); }
+                };
+                reader.readAsText(file);
+                e.target.value = ''; // reset so same file can be re-selected
+              }} />
+            </label>
             {parseError && (
               <div className="mt-2 flex items-start gap-2 text-red-600 text-sm bg-red-50 rounded-lg p-3">
                 <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
@@ -2121,97 +2190,46 @@ function AnalysisLab() {
   );
 
   // ── Step 3: Results ───────────────────────────────────────────────────────
-  if (step === 'results' && result) return (
-    <div className="space-y-6">
-      {/* Verdict banner */}
-      <div className={`rounded-2xl p-5 flex items-start gap-4 ${result.sig ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
-        {result.sig
-          ? <CheckCircle size={28} className="text-green-500 flex-shrink-0 mt-0.5" />
-          : <AlertCircle size={28} className="text-gray-400 flex-shrink-0 mt-0.5" />}
-        <div>
-          <div className="font-bold text-gray-900 text-base mb-1">{result.testName} — {result.sig ? 'Statistically Significant' : 'Not Significant'}</div>
-          <p className="text-sm text-gray-600 leading-relaxed">{result.interpretation}</p>
+  if (step === 'results' && results.length > 0) {
+    const primary = results[0];
+    return (
+      <div className="space-y-5">
+        {/* Primary verdict banner */}
+        <div className={`rounded-2xl p-5 flex items-start gap-4 ${primary.sig ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+          {primary.sig
+            ? <CheckCircle size={28} className="text-green-500 flex-shrink-0 mt-0.5" />
+            : <AlertCircle size={28} className="text-gray-400 flex-shrink-0 mt-0.5" />}
+          <div>
+            <div className="font-bold text-gray-900 text-base mb-1">
+              {primary.testName} — {primary.sig ? 'Statistically Significant' : 'Not Significant'}
+            </div>
+            <p className="text-sm text-gray-600 leading-relaxed">{primary.interpretation}</p>
+          </div>
+        </div>
+
+        {/* All result cards */}
+        {results.map((r, i) => (
+          <ResultCard key={`${r.testName}-${i}`} result={r} isPrimary={i === 0} />
+        ))}
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => { setStep('data'); setResults([]); }}
+            className="flex-1 flex items-center justify-center gap-2 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw size={14} /> Edit data & re-run
+          </button>
+          <button
+            onClick={handleReset}
+            className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-colors"
+          >
+            <Sparkles size={14} /> New analysis
+          </button>
         </div>
       </div>
-
-      {/* Stats table */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          Results
-        </div>
-        <table className="w-full text-sm">
-          <tbody className="divide-y divide-gray-100">
-            <tr className="hover:bg-gray-50">
-              <td className="px-5 py-3 text-gray-500 font-medium w-1/2">{result.statLabel}</td>
-              <td className="px-5 py-3 font-mono font-semibold text-gray-900">{isNaN(result.statValue) ? '—' : result.statValue}</td>
-            </tr>
-            {result.df && <tr className="hover:bg-gray-50"><td className="px-5 py-3 text-gray-500 font-medium">df</td><td className="px-5 py-3 font-mono text-gray-900">{result.df}</td></tr>}
-            {!isNaN(result.pValue) && (
-              <tr className="hover:bg-gray-50">
-                <td className="px-5 py-3 text-gray-500 font-medium">p-value</td>
-                <td className="px-5 py-3 font-mono font-semibold">
-                  <span className={result.pValue < 0.05 ? 'text-green-700' : 'text-gray-700'}>
-                    {result.pValue < 0.001 ? '< .001' : result.pValue.toFixed(3)}
-                    {result.pValue < 0.05 ? ' ✓ sig.' : ' n.s.'}
-                  </span>
-                </td>
-              </tr>
-            )}
-            {result.effectLabel && (
-              <tr className="hover:bg-gray-50">
-                <td className="px-5 py-3 text-gray-500 font-medium">Effect size</td>
-                <td className="px-5 py-3 font-mono text-gray-900">{result.effectLabel}</td>
-              </tr>
-            )}
-            {result.extraRows.map(([label, val]) => (
-              <tr key={label} className="hover:bg-gray-50">
-                <td className="px-5 py-3 text-gray-500">{label}</td>
-                <td className="px-5 py-3 font-mono text-gray-700 text-xs">{val}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Paper sentence */}
-      <div className="bg-violet-50 border border-violet-200 rounded-2xl p-5">
-        <div className="flex items-center gap-2 text-violet-700 font-semibold text-sm mb-2">
-          <Lightbulb size={14} /> Ready-to-use sentence for your paper
-        </div>
-        <p className="text-sm text-gray-800 leading-relaxed font-medium">{result.paperSentence}</p>
-        <button
-          onClick={() => navigator.clipboard?.writeText(result.paperSentence)}
-          className="mt-3 text-xs text-violet-600 hover:text-violet-800 underline"
-        >
-          Copy to clipboard
-        </button>
-      </div>
-
-      {/* Chart */}
-      {(result.chartType === 'bar' || result.chartType === 'scatter') && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Chart</div>
-          <canvas ref={chartRef} />
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => { setStep('data'); setResult(null); chartInst.current?.destroy(); chartInst.current = null; }}
-          className="flex-1 flex items-center justify-center gap-2 border border-gray-200 rounded-xl py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-        >
-          <RefreshCw size={14} /> Edit data & re-run
-        </button>
-        <button
-          onClick={handleReset}
-          className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-colors"
-        >
-          <Sparkles size={14} /> New analysis
-        </button>
-      </div>
-    </div>
-  );
+    );
+  }
 
   return null;
 }
