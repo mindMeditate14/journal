@@ -39,6 +39,17 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* ── Journal Masthead Strip ── */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex flex-wrap items-center gap-x-8 gap-y-2 text-xs text-gray-500">
+          <span><span className="font-semibold text-gray-700">Publisher:</span> Mind Meditate Resources, Malaysia</span>
+          <span><span className="font-semibold text-gray-700">First Published:</span> 2026</span>
+          <span><span className="font-semibold text-gray-700">Frequency:</span> Continuous (online-first)</span>
+          <span><span className="font-semibold text-gray-700">e-ISSN:</span> Pending registration &mdash; <a href="/journal-policy" className="text-indigo-600 hover:underline">Journal Policy</a></span>
+          <span><span className="font-semibold text-gray-700">Licence:</span> CC BY 4.0 &middot; No APC</span>
+        </div>
+      </div>
+
       <div className="max-w-5xl mx-auto px-6 py-12 space-y-12">
 
         {/* ── Aims & Scope ── */}
@@ -149,7 +160,7 @@ export default function AboutPage() {
         {/* ── Preface / Foreword ── */}
         <section>
           <h2 className="text-2xl font-bold text-gray-900 mb-4 border-l-4 border-indigo-600 pl-4">
-            Preface
+            From the Founding Editorial Board Member
           </h2>
           <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 text-gray-700 leading-relaxed space-y-3 text-sm italic">
             <p>
@@ -171,7 +182,44 @@ export default function AboutPage() {
             </p>
             <p className="not-italic font-semibold text-gray-900 mt-4">
               Ts. Dr. Sivabalan Vellasamy, Ed.D.<br />
-              <span className="font-normal text-gray-600 text-xs">Founding Editor, Traditional Medicine International</span>
+              <span className="font-normal text-gray-600 text-xs">Founding Editorial Board Member, Traditional Medicine International</span>
+            </p>
+          </div>
+        </section>
+
+        {/* ── About the Founding Member ── */}
+        <section>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 border-l-4 border-violet-600 pl-4">
+            About the Founding Editorial Board Member
+          </h2>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4 text-sm text-gray-700 leading-relaxed">
+            <p>
+              <strong>Ts. Dr. Sivabalan Vellasamy, Ed.D.</strong> holds a Doctorate in Education and brings
+              interdisciplinary expertise spanning holistic science, traditional medicine research, human
+              development, and technology-integrated education. He currently serves as <strong>Vice President
+              of the Malaysian Indian Siddha and Ayurveda Association (MISAA)</strong> and <strong>President
+              of the Malaysian Skills and Social Development Association (PPKSM)</strong> — roles that place
+              him at the intersection of traditional medicine advocacy, practitioner development, and
+              community-centred research.
+            </p>
+            <p>
+              He is the author of <strong>five books on Yogic Science and holistic human development</strong>,
+              contributing to the growing body of literature that bridges classical wisdom traditions with
+              contemporary scientific frameworks. His work emphasises the importance of contextualising
+              traditional knowledge within evidence-based research methodology — a conviction that directly
+              informs the editorial mission of this journal.
+            </p>
+            <p>
+              Dr. Sivabalan is also the creator of <strong>Archetiq</strong>, an applied holistic science
+              platform that maps individual personality archetypes, developmental tendencies, and life
+              alignment pathways — a practical expression of the principles that underlie integrative
+              human development research.
+            </p>
+            <p>
+              His founding of <em>Traditional Medicine International</em> reflects a long-held belief that
+              traditional healing knowledge — practised across millennia and carried by living communities —
+              deserves a credible, open, and rigorously peer-reviewed publication home that serves both
+              scholars and practitioners alike.
             </p>
           </div>
         </section>

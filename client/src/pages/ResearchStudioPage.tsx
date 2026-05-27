@@ -1683,8 +1683,12 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult[] {
 
   if (type === 'paired') {
     const dataLines = skipHeader(lines);
-    const pairs = dataLines.map(l => l.split(/[,\t]+/).map(s => Number(s.trim())));
-    const valid = pairs.filter(p => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
+    // Skip leading non-numeric cells (e.g. Participant ID column from template)
+    const pairs = dataLines.map(l => {
+      const cells = l.split(/[,\t]+/).map(s => s.trim());
+      return cells.filter(c => c !== '' && !isNaN(Number(c))).map(Number);
+    });
+    const valid = pairs.filter(p => p.length >= 2);
     if (valid.length < 3) throw new Error('Need at least 3 valid rows (before, after).');
     const col1 = valid.map(p => p[0]), col2 = valid.map(p => p[1]);
     out.push(runPairedTTest(col1, col2, labels[0] ?? 'Before', labels[1] ?? 'After'));
@@ -1705,15 +1709,21 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult[] {
       const dataLines = skipHeader(lines);
       const groupMap: Record<string, number[]> = {};
       for (const line of dataLines) {
-        const cells = line.split(/[,\t]+/);
+        const cells = line.split(/[,\t]+/).map(s => s.trim());
         if (cells.length < 2) continue;
-        const gName = cells[0].trim();
-        if (!gName || !isNaN(Number(gName))) continue;
-        // First numeric cell after group name
-        for (let ci = 1; ci < cells.length; ci++) {
-          const n = Number(cells[ci].trim());
-          if (!isNaN(n)) { if (!groupMap[gName]) groupMap[gName] = []; groupMap[gName].push(n); break; }
+        // Find last non-numeric, non-empty cell before the first numeric cell
+        // (handles Participant + Group columns from template: P001, Treatment, 78, ...)
+        let gName = '';
+        let firstNumIdx = -1;
+        for (let ci = 0; ci < cells.length; ci++) {
+          const v = cells[ci];
+          if (v !== '' && !isNaN(Number(v))) { firstNumIdx = ci; break; }
+          else if (v !== '') { gName = v; } // keep updating — last text cell before numbers wins
         }
+        if (!gName || firstNumIdx === -1) continue;
+        const n = Number(cells[firstNumIdx]);
+        if (!groupMap[gName]) groupMap[gName] = [];
+        groupMap[gName].push(n);
       }
       groups.length = 0;
       for (const [name, values] of Object.entries(groupMap)) if (values.length > 0) groups.push({ name, values });
@@ -1729,8 +1739,12 @@ function runAnalysis(raw: string, rec: Recommendation): StatResult[] {
 
   if (type === 'correlation') {
     const dataLines = skipHeader(lines);
-    const pairs = dataLines.map(l => l.split(/[,\t]+/).map(s => Number(s.trim())));
-    const valid = pairs.filter(p => p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]));
+    // Skip leading non-numeric cells (e.g. Participant ID column from template)
+    const pairs = dataLines.map(l => {
+      const cells = l.split(/[,\t]+/).map(s => s.trim());
+      return cells.filter(c => c !== '' && !isNaN(Number(c))).map(Number);
+    });
+    const valid = pairs.filter(p => p.length >= 2);
     if (valid.length < 5) throw new Error('Need at least 5 valid x, y pairs.');
     const x = valid.map(p => p[0]), y = valid.map(p => p[1]);
     out.push(runPearson(x, y, labels[0] ?? 'X', labels[1] ?? 'Y'));

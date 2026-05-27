@@ -6,6 +6,7 @@ interface BoardMember {
   title: string;
   specialty?: string;
   institution: string;
+  institution2?: string;
   country: string;
   role?: string;
 }
@@ -16,6 +17,15 @@ const EDITOR_IN_CHIEF: BoardMember = {
   institution: 'AIMST University, Bedong, Kedah',
   country: 'Malaysia',
   role: 'Editor-in-Chief',
+};
+
+const FOUNDING_EDITOR: BoardMember = {
+  name: 'Ts. Dr. Sivabalan Vellasamy, Ed.D.',
+  title: 'Researcher in Education, Holistic Science & Human Development',
+  institution: 'Vice President, Malaysian Indian Siddha and Ayurveda Association (MISAA)',
+  institution2: 'President, Malaysian Skills and Social Development Association (PPKSM)',
+  country: 'Malaysia',
+  role: 'Founding Editorial Board Member',
 };
 
 const BOARD_MEMBERS: BoardMember[] = [
@@ -32,20 +42,19 @@ const BOARD_MEMBERS: BoardMember[] = [
     institution: 'Faculty of Medicine and Health Sciences, Universiti Putra Malaysia (UPM)',
     country: 'Serdang, Selangor, Malaysia',
   },
-  {
-    name: 'Ts. Dr. Sivabalan Vellasamy, Ed.D.',
-    title: 'Vice President, MISAA',
-    specialty: 'Siddha Practitioner',
-    institution: 'Malaysian Indian Siddha & Ayurveda Association (MISAA)',
-    country: 'Malaysia',
-  },
 ];
 
-function MemberCard({ member, highlight }: { member: BoardMember; highlight?: boolean }) {
+function MemberCard({ member, highlight, accent }: { member: BoardMember; highlight?: boolean; accent?: 'indigo' | 'violet' }) {
+  const badgeCls = accent === 'violet'
+    ? 'bg-violet-600 text-white'
+    : 'bg-indigo-600 text-white';
+  const cardCls = highlight
+    ? accent === 'violet' ? 'bg-violet-50 border-violet-200' : 'bg-indigo-50 border-indigo-200'
+    : 'bg-white border-gray-200';
   return (
-    <div className={`rounded-xl border p-5 shadow-sm ${highlight ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-200'}`}>
+    <div className={`rounded-xl border p-5 shadow-sm ${cardCls}`}>
       {member.role && (
-        <span className="inline-block text-xs font-bold uppercase tracking-wider bg-indigo-600 text-white px-2 py-0.5 rounded mb-3">
+        <span className={`inline-block text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded mb-3 ${badgeCls}`}>
           {member.role}
         </span>
       )}
@@ -55,6 +64,9 @@ function MemberCard({ member, highlight }: { member: BoardMember; highlight?: bo
         <p className="text-xs text-violet-600 font-medium mt-0.5">{member.specialty}</p>
       )}
       <p className="text-sm text-gray-600 mt-1">{member.institution}</p>
+      {member.institution2 && (
+        <p className="text-sm text-gray-600 mt-0.5">{member.institution2}</p>
+      )}
       <p className="text-xs text-gray-400 mt-1">📍 {member.country}</p>
     </div>
   );
@@ -98,7 +110,26 @@ export default function EditorialBoardPage() {
         </div>
       </section>
 
+      {/* ── Journal Masthead Strip ── */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex flex-wrap items-center gap-x-8 gap-y-2 text-xs text-gray-500">
+          <span><span className="font-semibold text-gray-700">Publisher:</span> Mind Meditate Resources, Malaysia</span>
+          <span><span className="font-semibold text-gray-700">First Published:</span> 2026</span>
+          <span><span className="font-semibold text-gray-700">Frequency:</span> Continuous (online-first)</span>
+          <span><span className="font-semibold text-gray-700">e-ISSN:</span> Pending registration &mdash; <a href="/journal-policy" className="text-indigo-600 hover:underline">Journal Policy</a></span>
+          <span><span className="font-semibold text-gray-700">Licence:</span> CC BY 4.0 &middot; No APC</span>
+        </div>
+      </div>
+
       <div className="max-w-5xl mx-auto px-6 py-12 space-y-12">
+
+        {/* ── Founding Editor ── */}
+        <section>
+          <h2 className="text-xl font-bold text-gray-900 mb-5 border-l-4 border-violet-600 pl-4">
+            Founding Editor
+          </h2>
+          <MemberCard member={FOUNDING_EDITOR} highlight accent="violet" />
+        </section>
 
         {/* ── Editor-in-Chief ── */}
         <section>
