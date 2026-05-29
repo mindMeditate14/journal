@@ -485,6 +485,13 @@ export function EditorDashboardPage() {
 
                 <div className="space-y-3 mb-6">
                   <div>
+                    <p className="text-sm text-gray-600">Article Type</p>
+                    <span className="inline-block mt-1 text-xs font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                      {selectedManuscript.articleType || 'Research Article'}
+                    </span>
+                  </div>
+
+                  <div>
                     <p className="text-sm text-gray-600">Authors</p>
                     <p className="text-gray-900">
                       {selectedManuscript.authors.map(a => a.name).join(', ')}

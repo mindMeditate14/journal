@@ -1564,7 +1564,9 @@ export async function publishManuscript(req, res, next) {
           isOpenAccess: true,
           qualityScore: 80,
           language: 'English',
-          documentType: manuscript.discipline
+          documentType: manuscript.articleType
+            ? manuscript.articleType
+            : manuscript.discipline
             ? manuscript.discipline.trim()
             : 'Research Article',
           articleNumber: `TMI-${new Date(manuscript.publishedAt).getFullYear()}-${String(manuscript._id).slice(-4).toUpperCase()}`,

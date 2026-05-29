@@ -32,6 +32,7 @@ export function SubmitManuscriptPage() {
     body: '',
     discipline: '',
     methodology: '',
+    articleType: 'Research Article',
     fundingStatement: '',
     conflictOfInterest: '',
     dataAvailability: '',
@@ -61,6 +62,7 @@ export function SubmitManuscriptPage() {
               : [{ name: '', email: '', affiliation: '', orcid: '' }],
           body: draft.body || '',
           discipline: draft.discipline || '',
+          articleType: draft.articleType || 'Research Article',
           methodology: draft.methodology || '',
           fundingStatement: draft.fundingStatement || '',
           conflictOfInterest: draft.conflictOfInterest || '',
@@ -129,6 +131,7 @@ export function SubmitManuscriptPage() {
         body: formData.body,
         discipline: formData.discipline,
         methodology: formData.methodology,
+        articleType: formData.articleType,
         fundingStatement: formData.fundingStatement,
         conflictOfInterest: formData.conflictOfInterest,
         dataAvailability: formData.dataAvailability,
@@ -213,6 +216,7 @@ export function SubmitManuscriptPage() {
         body: formData.body.trim(),
         discipline: formData.discipline.trim(),
         methodology: formData.methodology.trim(),
+        articleType: formData.articleType,
         fundingStatement: formData.fundingStatement,
         conflictOfInterest: formData.conflictOfInterest,
         dataAvailability: formData.dataAvailability,
@@ -321,6 +325,18 @@ export function SubmitManuscriptPage() {
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Article Type *</label>
+                  <select
+                    value={formData.articleType}
+                    onChange={(e) => handleField('articleType', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                  >
+                    {['Research Article','Review Article','Systematic Review','Case Report','Short Communication','Editorial','Commentary','Letter to the Editor'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Discipline *</label>
                   <input
                     value={formData.discipline}
@@ -329,6 +345,7 @@ export function SubmitManuscriptPage() {
                     required
                   />
                 </div>
+              </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Methodology *</label>
                   <input

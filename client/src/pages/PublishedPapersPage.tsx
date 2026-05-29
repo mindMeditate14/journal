@@ -200,7 +200,7 @@ export default function PublishedPapersPage() {
                     {/* Badges row */}
                     <div className="flex flex-wrap gap-2 mb-3">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
-                        Original Research
+                        {paper.documentType || 'Research Article'}
                       </span>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-md">
                         Open Access

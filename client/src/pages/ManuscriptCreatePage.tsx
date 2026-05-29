@@ -20,6 +20,7 @@ export default function ManuscriptCreatePage() {
   const [keywords, setKeywords] = useState('');
   const [discipline, setDiscipline] = useState('');
   const [methodology, setMethodology] = useState('');
+  const [articleType, setArticleType] = useState('Research Article');
   const [authors, setAuthors] = useState<AuthorInput[]>([{ ...EMPTY_AUTHOR }]);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
 
@@ -54,6 +55,7 @@ export default function ManuscriptCreatePage() {
       keywords: keywords.split(',').map((keyword) => keyword.trim()).filter(Boolean),
       discipline: discipline || 'general',
       methodology: methodology || 'external-submission',
+      articleType: articleType || 'Research Article',
       authors: normalizedAuthors.length > 0 ? normalizedAuthors : [{ name: 'Anonymous', email: '', affiliation: '' }],
     };
   };
@@ -182,6 +184,18 @@ export default function ManuscriptCreatePage() {
             <div className="border-b pb-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">2. Classification</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Article Type</label>
+                  <select
+                    value={articleType}
+                    onChange={(event) => setArticleType(event.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {['Research Article','Review Article','Systematic Review','Case Report','Short Communication','Editorial','Commentary','Letter to the Editor'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Discipline</label>
                   <select

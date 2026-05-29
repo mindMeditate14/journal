@@ -70,6 +70,20 @@ const manuscriptSchema = new mongoose.Schema(
     fundingStatement: String,
     conflictOfInterest: String,
     dataAvailability: String,
+    articleType: {
+      type: String,
+      enum: [
+        'Research Article',
+        'Review Article',
+        'Systematic Review',
+        'Case Report',
+        'Short Communication',
+        'Editorial',
+        'Commentary',
+        'Letter to the Editor',
+      ],
+      default: 'Research Article',
+    },
     finalDocument: {
       originalName: String,
       fileName: String,
