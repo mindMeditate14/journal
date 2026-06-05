@@ -137,7 +137,7 @@ export default function AboutPage() {
                   ['Contact', 'editor@tradmedint.com'],
                   ['Publication Medium', 'Online (Open Access)'],
                   ['Publication Model', 'Continuous publication (articles published as accepted)'],
-                  ['Article Processing Charges', 'None — fully open access, no APC'],
+                  ['Article Processing Charges', 'Up to USD 150 · Discounts available'],
                   ['Peer Review', 'Double-blind'],
                   ['Language', 'English'],
                   ['First Year of Publication', '2026'],

@@ -55,7 +55,7 @@ export default function SubmissionGuidelinesPage() {
         {/* ── Quick Summary ── */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: 'Article Processing Charge', value: 'None (Free)' },
+            { label: 'Article Processing Charge', value: 'Up to USD 150' },
             { label: 'Peer Review', value: 'Double-blind' },
             { label: 'Review Time', value: '4–8 weeks' },
             { label: 'Language', value: 'English' },
@@ -253,7 +253,7 @@ export default function SubmissionGuidelinesPage() {
           <h3 className="text-xl font-bold mb-2">Ready to Submit?</h3>
           <p className="text-indigo-100 text-sm max-w-lg mx-auto mb-5">
             Create a free author account and submit your manuscript for peer review.
-            No article processing charges — fully open access.
+            APC up to USD 150 — discounts and waivers available on request.
           </p>
           <Link
             to="/register"

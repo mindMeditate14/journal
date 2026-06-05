@@ -93,8 +93,11 @@ export default function JournalPolicyPage() {
               texts of articles, provided appropriate credit is given to the original authors and source.
             </p>
             <p>
-              Traditional Medicine International charges <strong>no Article Processing Charges (APC)</strong>. There are no
-              submission fees, no publication fees, and no access fees to authors or readers.
+              An <strong>Article Processing Charge (APC) of up to USD 150</strong> applies to cover editorial and
+              production costs. Discounts or full waivers are available on a case-by-case basis — authors from
+              low-income countries or with demonstrated financial need are encouraged to contact the editorial
+              office at <a href="mailto:editor@tradmedint.com" className="text-emerald-700 underline">editor@tradmedint.com</a> before
+              submission. There are no submission fees and no access fees for readers.
             </p>
             <div className="flex items-center gap-3 mt-2">
               <a
@@ -128,6 +131,37 @@ export default function JournalPolicyPage() {
             </p>
             <p className="font-semibold">
               © {year} The respective authors. Published by Mind Meditate Resources under CC BY 4.0.
+            </p>
+          </div>
+        </section>
+
+        {/* ── Self-Archiving & Repository Policy ── */}
+        <section>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 border-l-4 border-indigo-600 pl-4">
+            Self-Archiving &amp; Repository Policy
+          </h2>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 text-sm text-gray-700 leading-relaxed space-y-3">
+            <p>
+              Traditional Medicine International operates a <strong>green open-access self-archiving policy</strong>.
+              Authors are explicitly permitted — and encouraged — to deposit and distribute their work through
+              any of the following channels at any stage:
+            </p>
+            <ul className="list-disc list-inside space-y-1 pl-2">
+              <li><strong>Institutional repositories</strong> — university or research-institution repositories (e.g. ePrints, DSpace, IREP)</li>
+              <li><strong>Subject repositories</strong> — discipline-specific archives (e.g. PubMed Central, arXiv, bioRxiv, SSRN)</li>
+              <li><strong>National depositories</strong> — government-mandated archives (e.g. MyJurnal, Zenodo, OSF)</li>
+              <li><strong>Personal or institutional websites</strong> — author's own academic profile or laboratory page</li>
+              <li><strong>Preprint servers</strong> — posting of preprints before or after peer review is permitted</li>
+            </ul>
+            <p>
+              When depositing, authors should cite the final published version and include the DOI and the
+              journal name (<em>Traditional Medicine International</em>, e-ISSN 3154-7443) to ensure proper attribution.
+              The published version (Version of Record) is freely available at{' '}
+              <a href="https://tradmedint.com" className="text-indigo-600 underline hover:text-indigo-800">tradmedint.com</a> and
+              on Zenodo under the same CC BY 4.0 licence.
+            </p>
+            <p>
+              There is <strong>no embargo period</strong>. Authors may self-archive immediately upon publication.
             </p>
           </div>
         </section>
