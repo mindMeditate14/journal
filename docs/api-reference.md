@@ -1,6 +1,6 @@
 # NexusJournal — API Reference
 
-Base URL: `https://journal.mind-meditate.com/api`  
+Base URL: `https://tradmedint.com/api`  
 Auth: `Authorization: Bearer <jwt>` (all protected routes)  
 JWT stored in client localStorage, issued by `/api/auth/login`.
 
@@ -85,6 +85,29 @@ All public (no auth required).
 | GET | `/papers/:id` (HTML) | Server-rendered HTML with `citation_*` meta tags for Google Scholar |
 | GET | `/sitemap.xml` | All paper URLs for crawler |
 | GET | `/robots.txt` | `Allow: *` + Sitemap pointer |
+
+---
+
+## OAI-PMH 2.0 — `/oai`
+
+Public endpoint (no auth). Used by MySitasi, DOAJ, and any OAI-PMH harvester.
+Base URL to register with harvesters: `https://tradmedint.com/oai`
+
+| Verb | Query params | Description |
+|---|---|---|
+| `Identify` | — | Repository identity and metadata |
+| `ListMetadataFormats` | — | Returns supported formats (`oai_dc`) |
+| `ListSets` | — | Returns `noSetHierarchy` (sets not used) |
+| `ListIdentifiers` | `metadataPrefix=oai_dc` · optional `from` / `until` (YYYY-MM-DD) | All published paper identifiers + datestamps |
+| `ListRecords` | `metadataPrefix=oai_dc` · optional `from` / `until` | Full Dublin Core XML records for all published papers |
+| `GetRecord` | `identifier=oai:tradmedint.com:<mongoId>` · `metadataPrefix=oai_dc` | Single paper record |
+
+**Dublin Core fields per record:** `dc:title`, `dc:creator` (one per author + affiliation), `dc:subject` (keywords + topics), `dc:description` (abstract), `dc:publisher`, `dc:date`, `dc:type`, `dc:format`, `dc:identifier` (DOI URL + landing page URL), `dc:source` (journal name + eISSN), `dc:language`, `dc:rights` (CC BY 4.0).
+
+**Date filtering example:**
+```
+GET https://tradmedint.com/oai?verb=ListRecords&metadataPrefix=oai_dc&from=2026-01-01
+```
 
 > **Note:** `/papers/:id` is routed through nginx to Express (not the SPA). The React app hydrates normally in the browser; the meta tags are pre-injected into the HTML shell.
 

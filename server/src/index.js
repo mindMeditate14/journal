@@ -1,4 +1,4 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
@@ -24,8 +24,9 @@ import adminRoutes from './routes/admin.js';
 import practiceDataRoutes from './routes/practiceData.js';
 import configRoutes from './routes/config.js';
 import researchAIRoutes from './routes/researchAI.js';
+import oaiRoutes from './routes/oai.js';
 
-// ── Scholar-friendly paper page & sitemap ───────────────────────────────────
+// ΓöÇΓöÇ Scholar-friendly paper page & sitemap ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // Lazy-import Paper model to avoid circular deps at module load time
 async function getPaperModel() {
   const { default: Paper } = await import('./models/Paper.js');
@@ -51,7 +52,8 @@ function buildMetaTags(paper) {
     tags.push(`<meta name="citation_publication_date" content="${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}">`);
   }
   if (paper.journal?.name) tags.push(`<meta name="citation_journal_title" content="${escape(paper.journal.name)}">`);
-  if (paper.journal?.issn)  tags.push(`<meta name="citation_issn" content="${escape(paper.journal.issn)}">`);
+  const citationIssn = paper.journal?.issn || '3154-7443';
+  tags.push(`<meta name="citation_issn" content="${escape(citationIssn)}">`);
   if (paper.doi)            tags.push(`<meta name="citation_doi" content="${escape(paper.doi)}">`);
   // citation_pdf_url must be same subdirectory as abstract for Google Scholar
   tags.push(`<meta name="citation_pdf_url" content="${BASE_URL}/papers/${paper._id}/download">`);
@@ -63,7 +65,7 @@ function buildMetaTags(paper) {
   tags.push(`<meta property="og:url" content="${BASE_URL}/papers/${paper._id}">`);
   return tags.join('\n    ');
 }
-// ────────────────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 const app = express();
 
@@ -86,7 +88,7 @@ app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }
 // Serve uploaded working/final manuscript files.
 app.use('/uploads', express.static(path.resolve(process.cwd(), '../uploads')));
 
-// 5xx rate alerting — must be before routes
+// 5xx rate alerting ΓÇö must be before routes
 app.use(fiveXxMiddleware);
 
 // Health check
@@ -107,12 +109,15 @@ app.use('/api/config', configRoutes);
 app.use('/api/practice-data', practiceDataRoutes);
 app.use('/api/research-ai', researchAIRoutes);
 
-// ── SPA fallback for bare /papers path (nginx location /papers/ redirects /papers → /papers/) ──
+// ── OAI-PMH 2.0 (public — no auth) ──
+app.use('/oai', oaiRoutes);
+
+// ── SPA fallback for bare /papers path (nginx location /papers/ redirects /papers ΓåÆ /papers/) ΓöÇΓöÇ
 app.get(['/papers', '/papers/'], (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
-// ── Scholar-visible paper pages (/papers/:id → inject citation meta tags) ──
+// ΓöÇΓöÇ Scholar-visible paper pages (/papers/:id ΓåÆ inject citation meta tags) ΓöÇΓöÇ
 app.get('/papers/:id', async (req, res, next) => {
   try {
     const indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
@@ -131,7 +136,7 @@ app.get('/papers/:id', async (req, res, next) => {
   }
 });
 
-// ── robots.txt ──────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ robots.txt ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 app.get('/robots.txt', (req, res) => {
   res.setHeader('Content-Type', 'text/plain');
   res.send(`User-agent: *
@@ -140,7 +145,7 @@ Sitemap: ${BASE_URL}/sitemap.xml
 `);
 });
 
-// ── sitemap.xml ─────────────────────────────────────────────────────────────
+// ΓöÇΓöÇ sitemap.xml ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 app.get('/sitemap.xml', async (req, res, next) => {
   try {
     const Paper = await getPaperModel();
@@ -176,8 +181,8 @@ const PORT = process.env.PORT || 5005;
 const HOST = process.env.HOST || 'localhost';
 
 app.listen(PORT, HOST, () => {
-  logger.info(`🚀 NexusJournal API running on http://${HOST}:${PORT}`);
-  logger.info(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`≡ƒÜÇ NexusJournal API running on http://${HOST}:${PORT}`);
+  logger.info(`≡ƒô¥ Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 export default app;

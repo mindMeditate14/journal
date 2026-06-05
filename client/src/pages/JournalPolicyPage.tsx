@@ -18,6 +18,8 @@ export default function JournalPolicyPage() {
               <Link to="/about" className="hover:text-indigo-700">About</Link>
               <Link to="/editorial-board" className="hover:text-indigo-700">Editorial Board</Link>
               <Link to="/journal-policy" className="text-indigo-700 font-semibold">Journal Policy</Link>
+              <Link to="/publication-ethics" className="hover:text-indigo-700">Publication Ethics</Link>
+              <Link to="/submission-guidelines" className="hover:text-indigo-700">Submit Guidelines</Link>
               <Link to="/papers" className="hover:text-indigo-700">Papers</Link>
               <Link to="/register" className="bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition text-xs font-semibold">
                 Submit Research
@@ -59,7 +61,7 @@ export default function JournalPolicyPage() {
                   ['Publication Medium', 'Online (Electronic)'],
                   ['Publication Frequency', 'Continuous publication — articles published online upon acceptance'],
                   ['Language', 'English'],
-                  ['ISSN (Online)', 'Pending registration with Perpustakaan Negara Malaysia'],
+                  ['e-ISSN (Online)', '3154-7443'],
                   ['First Published', '2026'],
                   ['Journal Website', 'https://tradmedint.com'],
                   ['Contact', 'editor@tradmedint.com'],
@@ -223,6 +225,8 @@ export default function JournalPolicyPage() {
               <Link to="/about" className="hover:text-white">About</Link>
               <Link to="/editorial-board" className="hover:text-white">Editorial Board</Link>
               <Link to="/journal-policy" className="hover:text-white">Journal Policy</Link>
+              <Link to="/publication-ethics" className="hover:text-white">Publication Ethics</Link>
+              <Link to="/submission-guidelines" className="hover:text-white">Submit Guidelines</Link>
               <Link to="/papers" className="hover:text-white">Papers</Link>
             </div>
             <span className="text-xs text-slate-500">© {year} Mind Meditate Resources. All rights reserved.</span>

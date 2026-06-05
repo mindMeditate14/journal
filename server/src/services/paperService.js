@@ -676,7 +676,6 @@ export const getRelatedPapers = async (paperId, limit = 8) => {
 // Returns papers in this database whose references list contains the DOI of
 // the given paper — i.e. papers that cite it.
 export const getCitedByPapers = async (paperId) => {
-  const Paper = getPaperModel();
   const paper = await Paper.findById(paperId).select('doi title').lean();
   if (!paper) throw { status: 404, message: 'Paper not found' };
   if (!paper.doi) return [];

@@ -14,7 +14,7 @@ import logger from './logger.js';
 const PUBLISHER = {
   journalTitle:   'Traditional Medicine International',
   shortTitle:     'Trad. Med. Int.',
-  eISSN:          'Applied for',           // update to actual e-ISSN once assigned
+  eISSN:          '3154-7443',
   website:        'https://tradmedint.com',
   email:          'editor@tradmedint.com',
   publisherName:  'Mind Meditate Resources',

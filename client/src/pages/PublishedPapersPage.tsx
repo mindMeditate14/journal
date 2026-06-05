@@ -55,6 +55,8 @@ export default function PublishedPapersPage() {
               <Link to="/about" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">About</Link>
               <Link to="/editorial-board" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">Editorial Board</Link>
               <Link to="/journal-policy" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">Policy</Link>
+              <Link to="/publication-ethics" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">Ethics</Link>
+              <Link to="/submission-guidelines" className="hidden md:block text-sm font-medium text-gray-600 hover:text-indigo-700">Submit</Link>
               <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-indigo-700">Sign In</Link>
               <Link to="/register" className="text-sm font-semibold bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition-colors">
                 Submit Research
@@ -465,8 +467,8 @@ export default function PublishedPapersPage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="bg-slate-900 text-slate-400 text-sm">
+      {/* ── Footer (guests only — sidebar provides footer when logged in) ── */}
+      {!user && <footer className="bg-slate-900 text-slate-400 text-sm">
         <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
             <span className="font-bold text-white text-base">Traditional Medicine International</span>
@@ -476,14 +478,16 @@ export default function PublishedPapersPage() {
             <Link to="/about" className="hover:text-white">About</Link>
             <Link to="/editorial-board" className="hover:text-white">Editorial Board</Link>
             <Link to="/journal-policy" className="hover:text-white">Journal Policy</Link>
+            <Link to="/publication-ethics" className="hover:text-white">Publication Ethics</Link>
+            <Link to="/submission-guidelines" className="hover:text-white">Submit Guidelines</Link>
             <span>·</span>
-            <span>ISSN (Online): Pending</span>
+            <span>e-ISSN: 3154-7443</span>
             <span>·</span>
             <span>Open Access · CC BY 4.0</span>
           </div>
           <div className="text-xs text-slate-500">© {new Date().getFullYear()} Mind Meditate Resources. All rights reserved.</div>
         </div>
-      </footer>
+      </footer>}
     </div>
   );
 }

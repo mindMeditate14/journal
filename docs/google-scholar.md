@@ -1,6 +1,19 @@
-# NexusJournal — Google Scholar Indexing
+# NexusJournal — Indexing & Discoverability
 
-## How It Works
+## Indexing Methods Summary
+
+| Method | Endpoint / URL | Status | Serves |
+|---|---|---|---|
+| Google Scholar (citation meta tags) | `/papers/:id` | ✅ Live | Google Scholar |
+| Sitemap | `https://tradmedint.com/sitemap.xml` | ✅ Live | Googlebot / all crawlers |
+| robots.txt | `https://tradmedint.com/robots.txt` | ✅ Live | All crawlers |
+| OAI-PMH 2.0 | `https://tradmedint.com/oai` | ✅ Live (June 2026) | MySitasi, DOAJ, harvesters |
+| Zenodo records | `zenodo.org/records/*` | ✅ Live | Google Scholar (auto) |
+| Google Search Console | sitemap submitted | ⏳ Sitemap submit pending | Googlebot |
+
+---
+
+## Google Scholar
 
 Google Scholar does **not** have a submission form. It crawls your site via Google Search and detects papers using Highwire Press `citation_*` meta tags in the HTML `<head>`. The process is:
 
@@ -10,16 +23,18 @@ Google Scholar does **not** have a submission form. It crawls your site via Goog
 
 ---
 
-## What Is Already Implemented (as of May 2026)
+## What Is Already Implemented (as of June 2026)
 
 | Feature | Status | Details |
 |---|---|---|
 | `citation_*` meta tags | ✅ Live | Injected server-side by Express for every `/papers/:id` URL |
 | `citation_pdf_url` | ✅ Correct | Points to `/papers/:id/download` (same subdomain — required by Scholar) |
-| `sitemap.xml` | ✅ Live | `https://tradmedint.com/sitemap.xml` — all 337 paper URLs |
+| `citation_issn` | ✅ Live | Always outputs `3154-7443` (e-ISSN assigned May 2026) |
+| `sitemap.xml` | ✅ Live | `https://tradmedint.com/sitemap.xml` — all published paper URLs |
 | `robots.txt` | ✅ Live | `Allow: *` + Sitemap pointer |
 | Server-side rendering | ✅ Live | `/papers/*` routes through Express (not SPA) so crawlers see content |
 | Branded PDF download | ✅ Live | `/papers/:id/download` serves TradMed cover page + manuscript PDF |
+| **OAI-PMH 2.0** | ✅ Live | `https://tradmedint.com/oai` — Dublin Core, for MySitasi / DOAJ |
 
 ### Meta tags emitted per paper page
 ```html
@@ -80,6 +95,38 @@ Zenodo records are picked up by Google Scholar automatically — no action neede
 
 ---
 
+## OAI-PMH 2.0 Endpoint
+
+**Live since June 2026.** Allows MySitasi, DOAJ, and any OAI-PMH harvester to automatically pull all published paper metadata.
+
+**Base URL:** `https://tradmedint.com/oai`  
+**Protocol:** OAI-PMH 2.0  
+**Metadata format:** Dublin Core (`oai_dc`)  
+**Authentication:** None (fully public)
+
+### Supported verbs
+
+| Verb | Example URL |
+|---|---|
+| `Identify` | `https://tradmedint.com/oai?verb=Identify` |
+| `ListMetadataFormats` | `https://tradmedint.com/oai?verb=ListMetadataFormats` |
+| `ListIdentifiers` | `https://tradmedint.com/oai?verb=ListIdentifiers&metadataPrefix=oai_dc` |
+| `ListRecords` | `https://tradmedint.com/oai?verb=ListRecords&metadataPrefix=oai_dc` |
+| `GetRecord` | `https://tradmedint.com/oai?verb=GetRecord&identifier=oai:tradmedint.com:<mongoId>&metadataPrefix=oai_dc` |
+
+Date filtering: append `&from=2026-01-01&until=2026-12-31` to ListIdentifiers or ListRecords.
+
+### Usage — MySitasi
+Register with `https://tradmedint.com/oai` as the OAI-PMH base URL and select **OAI-PMH harvesting** as the indexing method. No API key required.
+
+### Usage — DOAJ
+After DOAJ application is accepted, enter the same base URL in the DOAJ journal settings for article-level metadata harvesting.
+
+### Source file
+`server/src/routes/oai.js` — mounted at `/oai` in `server/src/index.js`.
+
+---
+
 ## How New Papers Are Automatically Included
 
 When a manuscript is published via `POST /manuscripts/:id/publish`:
@@ -87,7 +134,9 @@ When a manuscript is published via `POST /manuscripts/:id/publish`:
 2. A `Paper` record is created in MongoDB via Mongoose (idempotent upsert on DOI)
 3. The Paper is immediately searchable on the journal site
 4. The `sitemap.xml` endpoint dynamically includes it
-5. Google Scholar picks it up on next crawl (days to weeks)
+5. The OAI-PMH `/oai?verb=ListRecords` endpoint automatically includes it
+6. Google Scholar picks it up on next crawl (days to weeks)
+7. MySitasi / DOAJ harvesters pick it up on their next harvest cycle
 
 **No manual action is required for newly published papers.**
 

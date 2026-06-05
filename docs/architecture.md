@@ -16,6 +16,7 @@ NexusJournal (deployed as the **TradMed International** journal platform) is a f
 | **AI** | Google Gemini (`@google/genai`) |
 | **PDF generation** | `pdf-lib` (server-side cover page) · `html2pdf.js` (client-side AI review PDF) |
 | **DOI / Archive** | Zenodo REST API |
+| **Harvesting** | OAI-PMH 2.0 (`/oai`) — Dublin Core, used by MySitasi / DOAJ |
 | **Email** | Nodemailer + local Postfix relay (`noreply@tradmedint.com`, port 25, no auth) |
 | **Process manager** | PM2 (`nexusjournal`, port **5005**) |
 | **Web server** | Nginx (reverse proxy + static SPA) |
@@ -31,8 +32,7 @@ NexusJournal (deployed as the **TradMed International** journal platform) is a f
 | Server files | `/opt/nexusjournal/server/` |
 | Built client | `/opt/nexusjournal/public/` |
 | Uploaded manuscripts | `/opt/nexusjournal/uploads/manuscripts/` (persistent, outside public) |
-| Domain (current) | `https://journal.mind-meditate.com` |
-| Domain (planned) | `https://tradmedint.com` |
+| Domain | `https://tradmedint.com` (migrated May 2026) |
 | PM2 process | `nexusjournal` (id 5) |
 | MongoDB connection | `mongodb://finscan_admin:<pass>@localhost:27017/journal_db?authSource=admin` |
 
@@ -61,7 +61,7 @@ server/src/
     ResearchProject.js
     IngestRun.js
     Settings.js
-  routes/                   One file per /api/<prefix>
+  routes/                   One file per /api/<prefix> + /oai
     auth.js                 /api/auth
     manuscripts.js          /api/manuscripts
     papers.js               /api/papers
@@ -72,6 +72,7 @@ server/src/
     workspace.js            /api/workspace
     practiceData.js         /api/practice-data
     passwordReset.js        /api/password-reset
+    oai.js                  /oai (OAI-PMH 2.0 — public, no auth)
   controllers/
     manuscriptController.js  ~1700 lines — core business logic
     paperController.js       Paper discovery + branded PDF download
@@ -97,8 +98,13 @@ client/src/
     LoginPage.tsx, RegisterPage.tsx, ForgotPasswordPage.tsx, ResetPasswordPage.tsx
     DashboardPage.tsx
     SearchPage.tsx
-    PublishedPapersPage.tsx  Landing page — public paper listing
-    PaperViewPage.tsx        Public paper detail + PDF viewer + download
+    PublishedPapersPage.tsx     Landing page — public paper listing
+    PaperViewPage.tsx           Public paper detail + PDF viewer + download
+    AboutPage.tsx               Journal info, publisher address, e-ISSN
+    EditorialBoardPage.tsx      Editor-in-Chief + board members
+    JournalPolicyPage.tsx       Journal scope and policy details
+    PublicationEthicsPage.tsx   COPE-aligned ethics policy (route: /publication-ethics)
+    SubmissionGuidelinesPage.tsx Submission instructions (route: /submission-guidelines)
     ManuscriptCreatePage.tsx
     ManuscriptEditPage.tsx
     ManuscriptRevisionPage.tsx

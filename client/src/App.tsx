@@ -36,6 +36,8 @@ import PaperViewPage from './pages/PaperViewPage';
 import AboutPage from './pages/AboutPage';
 import EditorialBoardPage from './pages/EditorialBoardPage';
 import JournalPolicyPage from './pages/JournalPolicyPage';
+import PublicationEthicsPage from './pages/PublicationEthicsPage';
+import SubmissionGuidelinesPage from './pages/SubmissionGuidelinesPage';
 import ResearchStudioPage from './pages/ResearchStudioPage';
 
 export default function App() {
@@ -64,6 +66,8 @@ export default function App() {
         <Route path="/about" element={<ConditionalLayout><AboutPage /></ConditionalLayout>} />
         <Route path="/editorial-board" element={<ConditionalLayout><EditorialBoardPage /></ConditionalLayout>} />
         <Route path="/journal-policy" element={<ConditionalLayout><JournalPolicyPage /></ConditionalLayout>} />
+        <Route path="/publication-ethics" element={<ConditionalLayout><PublicationEthicsPage /></ConditionalLayout>} />
+        <Route path="/submission-guidelines" element={<ConditionalLayout><SubmissionGuidelinesPage /></ConditionalLayout>} />
 
         {/* Protected Routes with Sidebar */}
         <Route element={<SidebarLayout />}>

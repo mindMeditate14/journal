@@ -199,10 +199,12 @@ export default function SidebarLayout({ children }: { children?: ReactNode }) {
             <footer className="bg-slate-900 text-slate-400 text-sm mt-auto">
               <div className="px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-3">
                 <span className="font-bold text-white text-sm">Traditional Medicine International</span>
-                <div className="flex gap-5 text-xs">
+                <div className="flex flex-wrap gap-4 text-xs justify-center">
                   <a href="/about" className="hover:text-white">About</a>
                   <a href="/editorial-board" className="hover:text-white">Editorial Board</a>
                   <a href="/journal-policy" className="hover:text-white">Journal Policy</a>
+                  <a href="/publication-ethics" className="hover:text-white">Publication Ethics</a>
+                  <a href="/submission-guidelines" className="hover:text-white">Submit Guidelines</a>
                   <a href="/papers" className="hover:text-white">Papers</a>
                 </div>
                 <span className="text-xs text-slate-500">© {new Date().getFullYear()} Mind Meditate Resources. All rights reserved.</span>

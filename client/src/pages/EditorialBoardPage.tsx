@@ -86,8 +86,8 @@ export default function EditorialBoardPage() {
             <nav className="flex items-center gap-5 text-sm font-medium text-gray-600">
               <Link to="/about" className="hover:text-indigo-700">About</Link>
               <Link to="/editorial-board" className="text-indigo-700 font-semibold">Editorial Board</Link>
-              <Link to="/journal-policy" className="hover:text-indigo-700">Journal Policy</Link>
-              <Link to="/papers" className="hover:text-indigo-700">Papers</Link>
+              <Link to="/journal-policy" className="hover:text-indigo-700">Journal Policy</Link>            <Link to="/publication-ethics" className="hover:text-indigo-700">Publication Ethics</Link>
+            <Link to="/submission-guidelines" className="hover:text-indigo-700">Submit Guidelines</Link>              <Link to="/papers" className="hover:text-indigo-700">Papers</Link>
               <Link to="/register" className="bg-indigo-600 text-white px-4 py-1.5 rounded-full hover:bg-indigo-700 transition text-xs font-semibold">
                 Submit Research
               </Link>
@@ -116,7 +116,7 @@ export default function EditorialBoardPage() {
           <span><span className="font-semibold text-gray-700">Publisher:</span> Mind Meditate Resources, Malaysia</span>
           <span><span className="font-semibold text-gray-700">First Published:</span> 2026</span>
           <span><span className="font-semibold text-gray-700">Frequency:</span> Continuous (online-first)</span>
-          <span><span className="font-semibold text-gray-700">e-ISSN:</span> Pending registration &mdash; <a href="/journal-policy" className="text-indigo-600 hover:underline">Journal Policy</a></span>
+          <span><span className="font-semibold text-gray-700">e-ISSN:</span> 3154-7443</span>
           <span><span className="font-semibold text-gray-700">Licence:</span> CC BY 4.0 &middot; No APC</span>
         </div>
       </div>
@@ -180,6 +180,8 @@ export default function EditorialBoardPage() {
               <Link to="/about" className="hover:text-white">About</Link>
               <Link to="/editorial-board" className="hover:text-white">Editorial Board</Link>
               <Link to="/journal-policy" className="hover:text-white">Journal Policy</Link>
+              <Link to="/publication-ethics" className="hover:text-white">Publication Ethics</Link>
+              <Link to="/submission-guidelines" className="hover:text-white">Submit Guidelines</Link>
               <Link to="/papers" className="hover:text-white">Papers</Link>
             </div>
             <span className="text-xs text-slate-500">© {new Date().getFullYear()} Mind Meditate Resources. All rights reserved.</span>
