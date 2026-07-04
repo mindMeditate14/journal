@@ -1,5 +1,7 @@
 # NexusJournal — Domain Migration to tradmedint.com
 
+> Archival note: this document records the completed NexusJournal domain cutover and preserves the migration procedure that was used in May 2026. It is not the source of truth for the current live environment. For active production URLs and deployment expectations, use [README.md](README.md), [operations.md](operations.md), and [google-scholar.md](google-scholar.md).
+
 ## Status: COMPLETE (migrated May 14, 2026)
 
 Previous domain: `https://journal.mind-meditate.com` → 301 redirects to new domain  

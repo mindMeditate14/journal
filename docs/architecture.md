@@ -128,7 +128,7 @@ client/src/
 
 ---
 
-## Nginx Routing (journal.mind-meditate.com)
+## Nginx Routing (tradmedint.com)
 
 ```
 /api/*           → proxy → Express :5005

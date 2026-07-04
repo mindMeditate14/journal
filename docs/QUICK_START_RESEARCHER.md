@@ -4,7 +4,7 @@
 
 ### **Step 1: Go to Submission Form** (1 min)
 ```
-1. Login at https://journal.mind-meditate.com
+1. Login at https://tradmedint.com
 2. Click Dashboard
 3. Click blue button: "Open Submission Form"
 4. Pick your journal from the list

@@ -116,7 +116,7 @@ You now have a **complete blueprint for transforming NexusJournal from a paper d
 
 ### **Flow 1: Author Submits** (10 minutes)
 ```
-Author Visits journal.mind-meditate.com
+Author Visits tradmedint.com
     ↓
 Browse journals, read scope
     ↓
